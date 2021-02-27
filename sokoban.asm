@@ -168,9 +168,13 @@ handlemove:
     ldy #0
     lda (ZP_PTR_2),y
     cmp #' ' ; empty block next to player?
-    bne @next
+    beq @moveplayertopoint2
+    cmp #'.' ; goal position next to player?
+    beq @moveplayertopoint2
+    bra @next ; no ' ' or '.' found next to player, is it a crate or a wall?
+@moveplayertopoint2:
     ; move player to pointer 2
-    jsr move3to2
+    jsr moveplayeronfield
     jsr moveplayerposition
 
     jsr cls
@@ -181,14 +185,20 @@ handlemove:
     ldy #0
     lda (ZP_PTR_2),y
     cmp #'$' ; crate next to player?
-    bne @done
-
+    beq @combinedmovecheck
+    cmp #'*' ; crate on goal next to player?
+    beq @combinedmovecheck
+    bra @done ; something else not able to push
+@combinedmovecheck:
     lda (ZP_PTR_1),y
     cmp #' ' ; space after crate?
-    bne @done
-    
-    jsr move2to1
-    jsr move3to2
+    beq @combinedmove
+    cmp #'.' ; goal after crate?
+    beq @combinedmove
+    bra @done ; nothing to move
+@combinedmove:
+    jsr movecrateonfield
+    jsr moveplayeronfield
     jsr moveplayerposition
 
     jsr cls
@@ -204,26 +214,93 @@ moveplayerposition:
     sta ZP_PTR_3+1
     rts
 
-move2to1:
+movecrateonfield:
     ; copies (ZP_PTR_2) to (ZP_PTR_1)
-    ; and copies ' ' to last position in (Z_PTR_2)
+    ; and handles different crate move options (normal / crate on goal)
+    ; NO WIN CODE YET!!!!
     ldy #0
     lda (ZP_PTR_2),y
+    ; was there a goal underneath the crate?
+    cmp #'*'
+    bne @crateonly
+    ; do we move to a goal position? (from goal to goal..)
+    lda (ZP_PTR_1),y
+    cmp #'.'
+    bne @movetonormalposition
+@movetogoalposition:
+    lda #'*' ; crate on goal symbol
+    sta (ZP_PTR_1),y
+    lda #'.'
+    sta (ZP_PTR_2),y
+    bra @done
+@movetonormalposition:
+    lda #'$'; crate symbol
+    sta (ZP_PTR_1),y
+    lda #'.'
+    sta (ZP_PTR_2),y
+    bra @done
+@crateonly:
+    ; is the destination a goal?
+    lda (ZP_PTR_1),y
+    cmp #'.'
+    bne @crateonly_nongoal
+    ; crate moves to goal, from a non-goal position
+    lda #'*'
     sta (ZP_PTR_1),y
     lda #' '
     sta (ZP_PTR_2),y
+    bra @done
+@crateonly_nongoal:
+    lda #'$'
+    sta (ZP_PTR_1),y
+    lda #' '; empty space to move the player in next
+    sta (ZP_PTR_2),y
+@done:
     rts
 
-move3to2:
+moveplayeronfield:
     ; copies (ZP_PTR_3) to (ZP_PTR_2)
-    ; and copies ' ' to last position in (Z_PTR_3)
+    ; and handles multiple player move options (normal / on goal)
     ldy #0
     lda (ZP_PTR_3),y
+    ; was there a goal underneath the player?
+    cmp #'+'
+    bne @playeronly
+    ; do we move to a goal position? (from goal to goal..)
+    lda (ZP_PTR_2),y
+    cmp #'.'
+    bne @movetonormalposition
+@movetogoalposition:
+    lda #'+' ; player on goal symbol
+    sta (ZP_PTR_2),y
+    lda #'.'
+    sta (ZP_PTR_3),y
+    bra @done
+@movetonormalposition:
+    lda #'@'; crate symbol
+    sta (ZP_PTR_2),y
+    lda #'.'
+    sta (ZP_PTR_3),y
+    bra @done
+@playeronly:
+    ; is the destination a goal?
+    lda (ZP_PTR_2),y
+    cmp #'.'
+    bne @playeronly_nongoal
+    ; player moves to goal, from a non-goal position
+    lda #'+'
     sta (ZP_PTR_2),y
     lda #' '
     sta (ZP_PTR_3),y
+    bra @done
+@playeronly_nongoal:
+    lda #'@'
+    sta (ZP_PTR_2),y
+    lda #' '; empty space
+    sta (ZP_PTR_3),y
+@done:
     rts
-
+    
 print:
     ; print from address ZP_PTR_1
     ; don't end with newline character
