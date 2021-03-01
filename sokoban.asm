@@ -1,5 +1,7 @@
 .include "x16.inc"
 
+temp = $30  ; used for temp 8/16 bit storage $30/$31
+
 .org $080D
 .segment "STARTUP"
 .segment "INIT"
@@ -93,15 +95,24 @@ handleright:
     ; 3 - player
     ; 2 - block to the right of the player
     ; 1 - block to the right of that block
-    lda ZP_PTR_3+1
-    sta ZP_PTR_2+1
-    sta ZP_PTR_1+1
+
+    ; ZP_PTR_2 = ZP_PTR_3 + 1x position
+    clc
     lda ZP_PTR_3
+    adc #$1               ; 1x position
     sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_2+1
+
+    ; ZP_PTR_1 = ZP_PTR_1 + 2x position
+    clc
+    lda ZP_PTR_3
+    adc #$2               ; 2x position
     sta ZP_PTR_1
-    inc ZP_PTR_2
-    inc ZP_PTR_1
-    inc ZP_PTR_1
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_1+1
 
     jsr handlemove
     rts
@@ -111,15 +122,24 @@ handleleft:
     ; 3 - player
     ; 2 - block to the left of the player
     ; 1 - block to the left of that block
-    lda ZP_PTR_3+1
-    sta ZP_PTR_2+1
-    sta ZP_PTR_1+1
+
+    ; ZP_PTR_2 = ZP_PTR_3 - 1x position
+    sec
     lda ZP_PTR_3
+    sbc #$1               ; 1x position
     sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_2+1
+
+    ; ZP_PTR_1 = ZP_PTR_1 - 2x position
+    sec
+    lda ZP_PTR_3
+    sbc #$2               ; 2x position
     sta ZP_PTR_1
-    dec ZP_PTR_2
-    dec ZP_PTR_1
-    dec ZP_PTR_1
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_1+1
 
     jsr handlemove
 
@@ -130,21 +150,30 @@ handleup:
     ; 3 - player
     ; 2 - block to the top of the player
     ; 1 - block to the top of that block
-    lda ZP_PTR_3+1
-    sta ZP_PTR_2+1
-    sta ZP_PTR_1+1
-    lda ZP_PTR_3
-    sta ZP_PTR_2
-    sta ZP_PTR_1
 
-    ldx #FIELDWIDTH
-@loop:
-    dec ZP_PTR_2
-    dec ZP_PTR_1
-    dec ZP_PTR_1
-    dex
-    bne @loop
-    
+    ; ZP_PTR_2 = ZP_PTR_3 - 1xFIELDWIDTH
+    lda #FIELDWIDTH 
+    sta temp
+    sec
+    lda ZP_PTR_3
+    sbc temp
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_2+1
+
+    ; ZP_PTR_1 = ZP_PTR_1 - 2xFIELDWIDTH
+    lda #FIELDWIDTH 
+    asl ; 2x
+    sta temp
+    sec
+    lda ZP_PTR_3
+    sbc temp
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_1+1
+
     jsr handlemove
 
 @done:
@@ -155,21 +184,30 @@ handledown:
     ; 3 - player
     ; 2 - block to the bottom of the player
     ; 1 - block to the bottom of that block
-    lda ZP_PTR_3+1
-    sta ZP_PTR_2+1
-    sta ZP_PTR_1+1
-    lda ZP_PTR_3
-    sta ZP_PTR_2
-    sta ZP_PTR_1
 
-    ldx #FIELDWIDTH
-@loop:
-    inc ZP_PTR_2
-    inc ZP_PTR_1
-    inc ZP_PTR_1
-    dex
-    bne @loop
-    
+    ; ZP_PTR_2 = ZP_PTR_3 + 1xFIELDWIDTH
+    lda #FIELDWIDTH
+    sta temp
+    clc
+    lda ZP_PTR_3
+    adc temp
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_2+1
+
+    ; ZP_PTR_1 = ZP_PTR_1 + 2xFIELDWIDTH
+    lda #FIELDWIDTH
+    asl ; 2x
+    sta temp
+    clc
+    lda ZP_PTR_3
+    adc temp
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_1+1
+
     jsr handlemove
     rts
 
