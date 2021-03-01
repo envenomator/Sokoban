@@ -9,24 +9,27 @@
    jmp start
 
 message: .byte "press a key",0
-up:   .byte "up",0
-down: .byte "down",0
-left: .byte "left",0
-right:.byte "right",0
-other:.byte "other",0
+winstatement: .byte "goal reached!",0
+
+; variables that the program uses during execution
+xpos:           .byte 0
+ypos:           .byte 0
+no_goals:       .byte 2
+no_goalsreached:.byte 0
+fieldwidth:     .byte 0
+fieldheight:    .byte 0
 
 field:
 ;     01234567890123  4
 .byte"       ####   "
 .byte"########  ##  "
 .byte"#          ###"
-;.byte"# @$$ ##   ..#"
-.byte"#    #  $@   #"
-.byte"# $$   ##  ..#"
-.byte"#         ####"
+.byte"# @$$ ##   ..#"
+.byte"#      ##  ..#"
+.byte"#  ..     ####"
 .byte"###########   "
 
-XPOS = 9 ; fixed value for now, need to read in later. zero-based value
+XPOS = 2 ; fixed value for now, need to read in later. zero-based value
 YPOS = 3 ; same
 
 FIELDWIDTH = 14
@@ -69,9 +72,20 @@ keyloop:
     bra @done
 @checkright:
     cmp #$1d
-    bne @done
+    bne @checkquit
     jsr handleright
+@checkquit:
+    cmp #$51
+    bne @done
+    rts
 @done:
+    ; check if we have reached all goals
+    lda no_goals
+    cmp no_goalsreached
+    bne @donenextkey
+    jsr printwinstatement
+    rts
+@donenextkey:
     jmp keyloop
 
 handleright:
@@ -217,7 +231,6 @@ moveplayerposition:
 movecrateonfield:
     ; copies (ZP_PTR_2) to (ZP_PTR_1)
     ; and handles different crate move options (normal / crate on goal)
-    ; NO WIN CODE YET!!!!
     ldy #0
     lda (ZP_PTR_2),y
     ; was there a goal underneath the crate?
@@ -234,6 +247,7 @@ movecrateonfield:
     sta (ZP_PTR_2),y
     bra @done
 @movetonormalposition:
+    dec no_goalsreached ; -1 win points
     lda #'$'; crate symbol
     sta (ZP_PTR_1),y
     lda #'.'
@@ -245,6 +259,7 @@ movecrateonfield:
     cmp #'.'
     bne @crateonly_nongoal
     ; crate moves to goal, from a non-goal position
+    inc no_goalsreached ; +1 to win
     lda #'*'
     sta (ZP_PTR_1),y
     lda #' '
@@ -322,10 +337,21 @@ printline:
     jsr CHROUT
     rts
 
+printwinstatement:
+    lda #<winstatement
+    sta ZP_PTR_1
+    lda #>winstatement
+    sta ZP_PTR_1+1
+    jsr printline
+    rts
+
 initfield:
     ;skeleton code for now
-    ; fixed (2,2) player position for now
-   
+    
+    ; reset goals
+    lda #0
+    sta no_goalsreached
+
     ; advance to start of field
     lda #<field
     sta ZP_PTR_3
