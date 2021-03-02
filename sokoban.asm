@@ -1,8 +1,12 @@
 .include "x16.inc"
 
+; constants
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 field = $100c; load for fields
 loadstart = $1000;
+NEWLINE = $0D
+UPPERCASE = $8E
+CLEARSCREEN = 147
 
 .org $080D
 .segment "STARTUP"
@@ -12,31 +16,27 @@ loadstart = $1000;
 
    jmp start
 
-message: .byte "press a key",0
+; string constants
+message:      .byte "press a key",0
 errormessage: .byte "error loading file",0
-quitmessage: .byte "press q to quit",0
-filename: .byte "levels.bin"
+quitmessage:  .byte "press q to quit",0
+filename:     .byte "levels.bin"
 filename_end:
-
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
-no_goals:       .byte 2
+no_goals:       .byte 0
 no_goalsreached:.byte 0
 fieldwidth:     .byte 0
 fieldheight:    .byte 0
-
-NEWLINE = $0D
-UPPERCASE = $8E
-CLEARSCREEN = 147
 
 ; usage of zeropage pointers:
 ; ZP_PTR_1 - temporary pointer
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
-; ZP_PTR_4 - use as height/width
 
 loadfield:
+    ; loads all fields from the file 'LEVELS.BIN'
     lda #filename_end - filename
     ldx #<filename
     ldy #>filename
@@ -47,11 +47,7 @@ loadfield:
     jsr SETLFS
     lda #$00 ; load to memory
     jsr LOAD
-    bcs @error
-    rts
-
-@error:
-    sec
+    ; sets carry flag on error, handled by upstream caller
     rts
 
 start:
