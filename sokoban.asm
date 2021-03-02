@@ -1,6 +1,8 @@
 .include "x16.inc"
 
 temp = $30  ; used for temp 8/16 bit storage $30/$31
+;field = $100a; load for fields
+loadstart = $1000;
 
 .org $080D
 .segment "STARTUP"
@@ -11,6 +13,9 @@ temp = $30  ; used for temp 8/16 bit storage $30/$31
    jmp start
 
 message: .byte "press a key",0
+filename: .byte "levels.bin"
+filename_end:
+
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
@@ -45,6 +50,25 @@ CLEARSCREEN = 147
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
 ; ZP_PTR_4 - use as height/width
+
+loadfield:
+    lda #filename_end - filename
+    ldx #<filename
+    ldy #>filename
+    jsr SETNAM
+    lda #$01
+    ldx #$08
+    ldy #$01
+    jsr SETLFS
+    lda #$00 ; load to memory
+    jsr LOAD
+    bcs @error
+    lda #'o'
+    jsr CHROUT
+    rts
+
+@error:
+    rts
 
 start:
     ; force uppercase
