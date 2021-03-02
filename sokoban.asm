@@ -409,10 +409,14 @@ initfield:
     sta no_goalsreached
 
     ; advance player to the field
-    lda #$16
+    lda $100a
     sta ZP_PTR_3
-    lda #$10
+    lda $100b
     sta ZP_PTR_3+1
+;    lda #$16
+;    sta ZP_PTR_3
+;    lda #$10
+;    sta ZP_PTR_3+1
 
     ; load fieldwidth from load area
     lda $1004

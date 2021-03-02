@@ -325,8 +325,8 @@ Current file: sokoban.asm
 00088C  1  60               rts ; exit program
 00088D  1               @next:
 00088D  1  20 49 0A         jsr initfield
-000890  1  20 AD 0A         jsr cls
-000893  1  20 69 0A         jsr printfield
+000890  1  20 AF 0A         jsr cls
+000893  1  20 6B 0A         jsr printfield
 000896  1               
 000896  1               keyloop:
 000896  1  20 E4 FF         jsr GETIN
@@ -502,8 +502,8 @@ Current file: sokoban.asm
 00096B  1  20 EC 09         jsr moveplayeronfield
 00096E  1  20 A2 09         jsr moveplayerposition
 000971  1               
-000971  1  20 AD 0A         jsr cls
-000974  1  20 69 0A         jsr printfield
+000971  1  20 AF 0A         jsr cls
+000974  1  20 6B 0A         jsr printfield
 000977  1               
 000977  1  60               rts
 000978  1               @next:
@@ -526,8 +526,8 @@ Current file: sokoban.asm
 000995  1  20 EC 09         jsr moveplayeronfield
 000998  1  20 A2 09         jsr moveplayerposition
 00099B  1               
-00099B  1  20 AD 0A         jsr cls
-00099E  1  20 69 0A         jsr printfield
+00099B  1  20 AF 0A         jsr cls
+00099E  1  20 6B 0A         jsr printfield
 0009A1  1               @done:
 0009A1  1  60               rts
 0009A2  1               
@@ -664,75 +664,79 @@ Current file: sokoban.asm
 000A4B  1  8D 58 08         sta no_goalsreached
 000A4E  1               
 000A4E  1                   ; advance player to the field
-000A4E  1  A9 16            lda #$16
-000A50  1  85 24            sta ZP_PTR_3
-000A52  1  A9 10            lda #$10
-000A54  1  85 25            sta ZP_PTR_3+1
-000A56  1               
-000A56  1                   ; load fieldwidth from load area
-000A56  1  AD 04 10         lda $1004
-000A59  1  8D 59 08         sta fieldwidth
-000A5C  1               
-000A5C  1                   ; load fieldheight from load area
-000A5C  1  AD 06 10         lda $1006
-000A5F  1  8D 5A 08         sta fieldheight
-000A62  1               
-000A62  1                   ; load goals from load area
-000A62  1  AD 08 10         lda $1008
-000A65  1  8D 57 08         sta no_goals
-000A68  1  60               rts
-000A69  1               
-000A69  1               printfield:
-000A69  1                   ; no clearscreen, just print the field to screen on current position
-000A69  1                   ; depends only on
-000A69  1                   ; - field label for start of field
-000A69  1               
-000A69  1  A9 0C            lda #<field
-000A6B  1  85 00            sta ZP_PTR_1
-000A6D  1  A9 10            lda #>field
-000A6F  1  85 01            sta ZP_PTR_1+1
-000A71  1  A2 00            ldx #0 ; row counter
-000A73  1               @nextrow:
-000A73  1  A0 00            ldy #0 ; column counter
-000A75  1               @row:
-000A75  1  B1 00            lda (ZP_PTR_1),y
-000A77  1  20 D2 FF         jsr CHROUT
-000A7A  1  C8               iny
-000A7B  1  CC 59 08         cpy fieldwidth
-000A7E  1  D0 F5            bne @row
-000A80  1               @endline:
-000A80  1  A9 0D            lda #NEWLINE
-000A82  1  20 D2 FF         jsr CHROUT
-000A85  1               
-000A85  1                   ; advance pointer to next row
-000A85  1  A5 00            lda ZP_PTR_1
-000A87  1  18               clc
-000A88  1  6D 59 08         adc fieldwidth
-000A8B  1  85 00            sta ZP_PTR_1
-000A8D  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
-000A8F  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-000A91  1  18               clc
-000A92  1  69 01            adc #1
-000A94  1  85 01            sta ZP_PTR_1+1
-000A96  1               @checklastrow:
-000A96  1                   ; last row?
-000A96  1  E8               inx
-000A97  1  EC 5A 08         cpx fieldheight
-000A9A  1  D0 D7            bne @nextrow
-000A9C  1               
-000A9C  1                   ; print quit message at the end of the field
-000A9C  1  A9 0D            lda #NEWLINE
-000A9E  1  20 D2 FF         jsr CHROUT
-000AA1  1  A9 2F            lda #<quitmessage
-000AA3  1  85 00            sta ZP_PTR_1
-000AA5  1  A9 08            lda #>quitmessage
-000AA7  1  85 01            sta ZP_PTR_1+1
-000AA9  1  20 34 0A         jsr printline
-000AAC  1               
-000AAC  1  60               rts
-000AAD  1               
-000AAD  1               cls:
-000AAD  1  A9 93            lda #CLEARSCREEN
-000AAF  1  20 D2 FF         jsr CHROUT
-000AB2  1  60               rts
-000AB2  1               
+000A4E  1  AD 0A 10         lda $100a
+000A51  1  85 24            sta ZP_PTR_3
+000A53  1  AD 0B 10         lda $100b
+000A56  1  85 25            sta ZP_PTR_3+1
+000A58  1               ;    lda #$16
+000A58  1               ;    sta ZP_PTR_3
+000A58  1               ;    lda #$10
+000A58  1               ;    sta ZP_PTR_3+1
+000A58  1               
+000A58  1                   ; load fieldwidth from load area
+000A58  1  AD 04 10         lda $1004
+000A5B  1  8D 59 08         sta fieldwidth
+000A5E  1               
+000A5E  1                   ; load fieldheight from load area
+000A5E  1  AD 06 10         lda $1006
+000A61  1  8D 5A 08         sta fieldheight
+000A64  1               
+000A64  1                   ; load goals from load area
+000A64  1  AD 08 10         lda $1008
+000A67  1  8D 57 08         sta no_goals
+000A6A  1  60               rts
+000A6B  1               
+000A6B  1               printfield:
+000A6B  1                   ; no clearscreen, just print the field to screen on current position
+000A6B  1                   ; depends only on
+000A6B  1                   ; - field label for start of field
+000A6B  1               
+000A6B  1  A9 0C            lda #<field
+000A6D  1  85 00            sta ZP_PTR_1
+000A6F  1  A9 10            lda #>field
+000A71  1  85 01            sta ZP_PTR_1+1
+000A73  1  A2 00            ldx #0 ; row counter
+000A75  1               @nextrow:
+000A75  1  A0 00            ldy #0 ; column counter
+000A77  1               @row:
+000A77  1  B1 00            lda (ZP_PTR_1),y
+000A79  1  20 D2 FF         jsr CHROUT
+000A7C  1  C8               iny
+000A7D  1  CC 59 08         cpy fieldwidth
+000A80  1  D0 F5            bne @row
+000A82  1               @endline:
+000A82  1  A9 0D            lda #NEWLINE
+000A84  1  20 D2 FF         jsr CHROUT
+000A87  1               
+000A87  1                   ; advance pointer to next row
+000A87  1  A5 00            lda ZP_PTR_1
+000A89  1  18               clc
+000A8A  1  6D 59 08         adc fieldwidth
+000A8D  1  85 00            sta ZP_PTR_1
+000A8F  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
+000A91  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+000A93  1  18               clc
+000A94  1  69 01            adc #1
+000A96  1  85 01            sta ZP_PTR_1+1
+000A98  1               @checklastrow:
+000A98  1                   ; last row?
+000A98  1  E8               inx
+000A99  1  EC 5A 08         cpx fieldheight
+000A9C  1  D0 D7            bne @nextrow
+000A9E  1               
+000A9E  1                   ; print quit message at the end of the field
+000A9E  1  A9 0D            lda #NEWLINE
+000AA0  1  20 D2 FF         jsr CHROUT
+000AA3  1  A9 2F            lda #<quitmessage
+000AA5  1  85 00            sta ZP_PTR_1
+000AA7  1  A9 08            lda #>quitmessage
+000AA9  1  85 01            sta ZP_PTR_1+1
+000AAB  1  20 34 0A         jsr printline
+000AAE  1               
+000AAE  1  60               rts
+000AAF  1               
+000AAF  1               cls:
+000AAF  1  A9 93            lda #CLEARSCREEN
+000AB1  1  20 D2 FF         jsr CHROUT
+000AB4  1  60               rts
+000AB4  1               
