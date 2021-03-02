@@ -1,7 +1,7 @@
 .include "x16.inc"
 
 temp = $30  ; used for temp 8/16 bit storage $30/$31
-;field = $100a; load for fields
+field = $100c; load for fields
 loadstart = $1000;
 
 .org $080D
@@ -13,34 +13,19 @@ loadstart = $1000;
    jmp start
 
 message: .byte "press a key",0
+errormessage: .byte "error loading file",0
+quitmessage: .byte "press q to quit",0
 filename: .byte "levels.bin"
 filename_end:
 
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
-xpos:           .byte 0
-ypos:           .byte 0
 no_goals:       .byte 2
 no_goalsreached:.byte 0
 fieldwidth:     .byte 0
 fieldheight:    .byte 0
 
-field:
-;     01234567890123  4
-.byte"       ####   "
-.byte"########  ##  "
-.byte"#          ###"
-.byte"# @$$ ##   ..#"
-.byte"#      ##  ..#"
-.byte"#  ..     ####"
-.byte"###########   "
-
-XPOS = 2 ; fixed value for now, need to read in later. zero-based value
-YPOS = 3 ; same
-
-FIELDWIDTH = 14
-FIELDHEIGHT = 7
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
@@ -63,11 +48,10 @@ loadfield:
     lda #$00 ; load to memory
     jsr LOAD
     bcs @error
-    lda #'o'
-    jsr CHROUT
     rts
 
 @error:
+    sec
     rts
 
 start:
@@ -75,6 +59,16 @@ start:
     lda #UPPERCASE
     jsr CHROUT
     
+    jsr loadfield
+    bcc @next
+    ; error
+    lda #<errormessage
+    sta ZP_PTR_1
+    lda #>errormessage
+    sta ZP_PTR_1+1
+    jsr printline
+    rts ; exit program
+@next:
     jsr initfield
     jsr cls
     jsr printfield
@@ -176,7 +170,7 @@ handleup:
     ; 1 - block to the top of that block
 
     ; ZP_PTR_2 = ZP_PTR_3 - 1xFIELDWIDTH
-    lda #FIELDWIDTH 
+    lda fieldwidth
     sta temp
     sec
     lda ZP_PTR_3
@@ -187,7 +181,7 @@ handleup:
     sta ZP_PTR_2+1
 
     ; ZP_PTR_1 = ZP_PTR_1 - 2xFIELDWIDTH
-    lda #FIELDWIDTH 
+    lda fieldwidth
     asl ; 2x
     sta temp
     sec
@@ -210,7 +204,7 @@ handledown:
     ; 1 - block to the bottom of that block
 
     ; ZP_PTR_2 = ZP_PTR_3 + 1xFIELDWIDTH
-    lda #FIELDWIDTH
+    lda fieldwidth
     sta temp
     clc
     lda ZP_PTR_3
@@ -221,7 +215,7 @@ handledown:
     sta ZP_PTR_2+1
 
     ; ZP_PTR_1 = ZP_PTR_1 + 2xFIELDWIDTH
-    lda #FIELDWIDTH
+    lda fieldwidth
     asl ; 2x
     sta temp
     clc
@@ -414,42 +408,29 @@ initfield:
     lda #0
     sta no_goalsreached
 
-    ; advance to start of field
-    lda #<field
+    ; advance player to the field
+    lda #$16
     sta ZP_PTR_3
-    lda #>field
+    lda #$10
     sta ZP_PTR_3+1
-    ; add x,y position to the pointer
-    lda ZP_PTR_3
-    clc
-    adc #XPOS
-    sta ZP_PTR_3
-    ; check carry to high byte
-    bcc @ypos
-    lda ZP_PTR_3+1 ; store carry to high byte
-    clc
-    adc #1
-    sta ZP_PTR_3+1
-@ypos:
-    lda ZP_PTR_3
-    clc
-    adc #(YPOS * FIELDWIDTH)
-    sta ZP_PTR_3
-    ; check for carry to high byte
-    bcc @done
-    lda ZP_PTR_3+1
-    clc
-    adc #1
-    sta ZP_PTR_3+1
-@done:
-   rts
+
+    ; load fieldwidth from load area
+    lda $1004
+    sta fieldwidth
+
+    ; load fieldheight from load area
+    lda $1006
+    sta fieldheight
+
+    ; load goals from load area
+    lda $1008
+    sta no_goals
+    rts
 
 printfield:
     ; no clearscreen, just print the field to screen on current position
     ; depends only on
     ; - field label for start of field
-    ; - FIELDHEIGHT constant
-    ; - FIELDWIDTH constant
 
     lda #<field
     sta ZP_PTR_1
@@ -462,7 +443,7 @@ printfield:
     lda (ZP_PTR_1),y
     jsr CHROUT
     iny
-    cpy #FIELDWIDTH
+    cpy fieldwidth
     bne @row
 @endline:
     lda #NEWLINE
@@ -471,7 +452,7 @@ printfield:
     ; advance pointer to next row
     lda ZP_PTR_1
     clc
-    adc #FIELDWIDTH
+    adc fieldwidth
     sta ZP_PTR_1
     bcc @checklastrow ; no carry, don't increment high byte on pointer
     lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
@@ -481,8 +462,18 @@ printfield:
 @checklastrow:
     ; last row?
     inx
-    cpx #FIELDHEIGHT
+    cpx fieldheight
     bne @nextrow
+
+    ; print quit message at the end of the field
+    lda #NEWLINE
+    jsr CHROUT
+    lda #<quitmessage
+    sta ZP_PTR_1
+    lda #>quitmessage
+    sta ZP_PTR_1+1
+    jsr printline
+
     rts
 
 cls:
