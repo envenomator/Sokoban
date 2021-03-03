@@ -562,6 +562,24 @@ printfield:
     ldy #0 ; column counter
 @row:
     lda (ZP_PTR_1),y
+    cmp #'@'
+    beq @character
+    cmp #'+'
+    beq @character
+    bra @normalcolor
+@character:
+    pha
+    lda #$9e ; YELLOW
+    jsr CHROUT
+    pla
+    jsr CHROUT
+    lda #$05 ; WHITE
+    jsr CHROUT
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@normalcolor:
     jsr CHROUT
     iny
     cpy fieldwidth

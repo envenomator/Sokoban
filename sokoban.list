@@ -333,7 +333,7 @@ Current file: sokoban.asm
 00089F  1                   ;jsr printdecimal
 00089F  1                   ;rts
 00089F  1                   ;jsr selectlevel
-00089F  1  20 45 0B         jsr cls
+00089F  1  20 66 0B         jsr cls
 0008A2  1  20 01 0B         jsr printfield
 0008A5  1               
 0008A5  1               keyloop:
@@ -510,7 +510,7 @@ Current file: sokoban.asm
 00097A  1  20 FB 09         jsr moveplayeronfield
 00097D  1  20 B1 09         jsr moveplayerposition
 000980  1               
-000980  1  20 45 0B         jsr cls
+000980  1  20 66 0B         jsr cls
 000983  1  20 01 0B         jsr printfield
 000986  1               
 000986  1  60               rts
@@ -534,7 +534,7 @@ Current file: sokoban.asm
 0009A4  1  20 FB 09         jsr moveplayeronfield
 0009A7  1  20 B1 09         jsr moveplayerposition
 0009AA  1               
-0009AA  1  20 45 0B         jsr cls
+0009AA  1  20 66 0B         jsr cls
 0009AD  1  20 01 0B         jsr printfield
 0009B0  1               @done:
 0009B0  1  60               rts
@@ -819,43 +819,61 @@ Current file: sokoban.asm
 000B0B  1  A0 00            ldy #0 ; column counter
 000B0D  1               @row:
 000B0D  1  B1 00            lda (ZP_PTR_1),y
-000B0F  1  20 D2 FF         jsr CHROUT
-000B12  1  C8               iny
-000B13  1  CC 6C 08         cpy fieldwidth
-000B16  1  D0 F5            bne @row
-000B18  1               @endline:
-000B18  1  A9 0D            lda #NEWLINE
-000B1A  1  20 D2 FF         jsr CHROUT
-000B1D  1               
-000B1D  1                   ; advance pointer to next row
-000B1D  1  A5 00            lda ZP_PTR_1
-000B1F  1  18               clc
-000B20  1  6D 6C 08         adc fieldwidth
-000B23  1  85 00            sta ZP_PTR_1
-000B25  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
-000B27  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-000B29  1  18               clc
-000B2A  1  69 01            adc #1
-000B2C  1  85 01            sta ZP_PTR_1+1
-000B2E  1               @checklastrow:
-000B2E  1                   ; last row?
-000B2E  1  E8               inx
-000B2F  1  EC 6D 08         cpx fieldheight
-000B32  1  D0 D7            bne @nextrow
-000B34  1               
-000B34  1                   ; print quit message at the end of the field
-000B34  1  A9 0D            lda #NEWLINE
-000B36  1  20 D2 FF         jsr CHROUT
-000B39  1  A9 40            lda #<quitmessage
-000B3B  1  85 00            sta ZP_PTR_1
-000B3D  1  A9 08            lda #>quitmessage
-000B3F  1  85 01            sta ZP_PTR_1+1
-000B41  1  20 43 0A         jsr printline
-000B44  1               
-000B44  1  60               rts
-000B45  1               
-000B45  1               cls:
-000B45  1  A9 93            lda #CLEARSCREEN
-000B47  1  20 D2 FF         jsr CHROUT
-000B4A  1  60               rts
-000B4A  1               
+000B0F  1  C9 40            cmp #'@'
+000B11  1  F0 06            beq @character
+000B13  1  C9 2B            cmp #'+'
+000B15  1  F0 02            beq @character
+000B17  1  80 17            bra @normalcolor
+000B19  1               @character:
+000B19  1  48               pha
+000B1A  1  A9 9E            lda #$9e ; YELLOW
+000B1C  1  20 D2 FF         jsr CHROUT
+000B1F  1  68               pla
+000B20  1  20 D2 FF         jsr CHROUT
+000B23  1  A9 05            lda #$05 ; WHITE
+000B25  1  20 D2 FF         jsr CHROUT
+000B28  1  C8               iny
+000B29  1  CC 6C 08         cpy fieldwidth
+000B2C  1  D0 DF            bne @row
+000B2E  1  80 09            bra @endline
+000B30  1               @normalcolor:
+000B30  1  20 D2 FF         jsr CHROUT
+000B33  1  C8               iny
+000B34  1  CC 6C 08         cpy fieldwidth
+000B37  1  D0 D4            bne @row
+000B39  1               @endline:
+000B39  1  A9 0D            lda #NEWLINE
+000B3B  1  20 D2 FF         jsr CHROUT
+000B3E  1               
+000B3E  1                   ; advance pointer to next row
+000B3E  1  A5 00            lda ZP_PTR_1
+000B40  1  18               clc
+000B41  1  6D 6C 08         adc fieldwidth
+000B44  1  85 00            sta ZP_PTR_1
+000B46  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
+000B48  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+000B4A  1  18               clc
+000B4B  1  69 01            adc #1
+000B4D  1  85 01            sta ZP_PTR_1+1
+000B4F  1               @checklastrow:
+000B4F  1                   ; last row?
+000B4F  1  E8               inx
+000B50  1  EC 6D 08         cpx fieldheight
+000B53  1  D0 B6            bne @nextrow
+000B55  1               
+000B55  1                   ; print quit message at the end of the field
+000B55  1  A9 0D            lda #NEWLINE
+000B57  1  20 D2 FF         jsr CHROUT
+000B5A  1  A9 40            lda #<quitmessage
+000B5C  1  85 00            sta ZP_PTR_1
+000B5E  1  A9 08            lda #>quitmessage
+000B60  1  85 01            sta ZP_PTR_1+1
+000B62  1  20 43 0A         jsr printline
+000B65  1               
+000B65  1  60               rts
+000B66  1               
+000B66  1               cls:
+000B66  1  A9 93            lda #CLEARSCREEN
+000B68  1  20 D2 FF         jsr CHROUT
+000B6B  1  60               rts
+000B6B  1               
