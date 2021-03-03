@@ -20,6 +20,7 @@ LEVELHEADER = 10
 
 ; string constants
 message:      .byte "press a key",0
+selectmessage:.byte "select a level: ",0
 errormessage: .byte "error loading file",0
 quitmessage:  .byte "press q to quit",0
 filename:     .byte "levels.bin"
@@ -71,6 +72,10 @@ start:
     rts ; exit program
 @next:
     jsr initfield
+    ;lda no_levels
+    ;jsr printdecimal
+    ;rts
+    ;jsr selectlevel
     jsr cls
     jsr printfield
 
@@ -402,17 +407,85 @@ printwinstatement:
     jsr printline
     rts
 
+printdecimal:
+    ; prints decimal from A register
+    ldy #$2f
+    ldx #$3a
+    sec
+@loop1:
+    iny
+    sbc #100
+    bcs @loop1
+@loop2:
+    dex
+    adc #10
+    bmi @loop2
+    adc #$2f
+
+    ; Y = hundreds, X = tens, A = ones
+    pha
+    txa
+    pha
+    tya
+    cmp #$30 ; is it a '0' petscii?
+    beq @tens
+    jsr CHROUT ; print Y
+@tens:
+    pla
+    cmp #$30 ; is it a '0' petscii?
+    beq @ones
+    jsr CHROUT ; print X
+@ones:
+    pla
+    jsr CHROUT ; print A
+
+    rts
+
+selectlevel:
+    lda #<selectmessage
+    sta ZP_PTR_1
+    lda #>selectmessage
+    sta ZP_PTR_1+1
+    jsr print
+
+@wait:
+    jsr GETIN   ; get character from the buffer
+    cmp #0
+    beq @wait
+
+    cmp #$31 ; petscii '1'
+    bcc @wait
+    cmp #$34 ; petscii '4'
+    bcs @wait
+    ; now between 1-3
+    sec
+    sbc #$30
+    sta currentlevel
+    rts
+
 initfield:
     ; reset goals
     lda #0
     sta no_goalsreached
 
-    ; load field pointer to current level
+    ; load field pointer to first address at LOADSTART
     ; load 1st pointer to temp pointer ZP_PTR_1
-    lda #<LOADSTART + 2 ; index to field payload ptr in field header
+    lda #<LOADSTART
     sta ZP_PTR_1
     lda #>LOADSTART
     sta ZP_PTR_1+1
+
+    ; first load number of levels, pointed to by ZP_PTR_1,0
+    ldy #0
+    lda (ZP_PTR_1),y
+    sta no_levels
+
+    ; skip to the first header, two bytes next
+    clc
+    lda ZP_PTR_1
+    adc #2
+    sta ZP_PTR_1
+
     ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
     lda currentlevel
     tax ; x contains the currentlevel now and will act as a counter
