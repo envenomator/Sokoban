@@ -1,13 +1,15 @@
 .include "x16.inc"
 
 ; constants
+;field = $100c; load for fields
+ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
-field = $100c; load for fields
-loadstart = $1000;
+
+LOADSTART = $1000;
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
-
+LEVELHEADER = 10
 .org $080D
 .segment "STARTUP"
 .segment "INIT"
@@ -25,10 +27,13 @@ filename_end:
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
-no_goals:       .byte 0
-no_goalsreached:.byte 0
-fieldwidth:     .byte 0
-fieldheight:    .byte 0
+
+currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+no_levels:      .byte 0 ; will be read by initfield
+no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
+no_goalsreached:.byte 0 ; static now, reset for each game
+fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
+fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
 
 ; usage of zeropage pointers:
 ; ZP_PTR_1 - temporary pointer
@@ -398,33 +403,76 @@ printwinstatement:
     rts
 
 initfield:
-    ;skeleton code for now
-    
     ; reset goals
     lda #0
     sta no_goalsreached
 
-    ; advance player to the field
-    lda $100a
+    ; load field pointer to current level
+    ; load 1st pointer to temp pointer ZP_PTR_1
+    lda #<LOADSTART + 2 ; index to field payload ptr in field header
+    sta ZP_PTR_1
+    lda #>LOADSTART
+    sta ZP_PTR_1+1
+    ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
+    lda currentlevel
+    tax ; x contains the currentlevel now and will act as a counter
+@loop:
+    dex
+    beq @fieldptrdone 
+    ; advance the field payload pointer
+    lda ZP_PTR_1
+    clc
+    adc #LEVELHEADER
+    sta ZP_PTR_1
+    bcc @loop   ; nothing to do for the high byte
+    lda ZP_PTR_1+1
+    adc #$0     ; increase the high byte
+    sta ZP_PTR_1+1
+    bra @loop
+@fieldptrdone:
+    ldy #0  ; index to the payload pointer itself
+    lda (ZP_PTR_1),y
+    sta ZP_PTR_FIELD
+    iny
+    lda (ZP_PTR_1),y
+    sta ZP_PTR_FIELD+1
+    ldy #2  ; index from payload pointer to width variable (low byte)
+    lda (ZP_PTR_1),y 
+    sta fieldwidth
+    ldy #4  ; index from payload pointer to height variable (low byte)
+    lda (ZP_PTR_1),y
+    sta fieldheight
+    ldy #6  ; index from payload pointer to goals in this level (low byte)
+    lda (ZP_PTR_1),y
+    sta no_goals
+    ldy #8  ; index from payload pointer to player ptr in this level
+    lda (ZP_PTR_1),y
     sta ZP_PTR_3
-    lda $100b
+    iny
+    lda (ZP_PTR_1),y
     sta ZP_PTR_3+1
+
+    ; advance player to the field
+;    lda $100a
+;    sta ZP_PTR_3
+;    lda $100b
+;    sta ZP_PTR_3+1
 ;    lda #$16
 ;    sta ZP_PTR_3
 ;    lda #$10
 ;    sta ZP_PTR_3+1
 
     ; load fieldwidth from load area
-    lda $1004
-    sta fieldwidth
+;    lda $1004
+;    sta fieldwidth
 
     ; load fieldheight from load area
-    lda $1006
-    sta fieldheight
+;    lda $1006
+;    sta fieldheight
 
     ; load goals from load area
-    lda $1008
-    sta no_goals
+;    lda $1008
+;    sta no_goals
     rts
 
 printfield:
@@ -432,9 +480,9 @@ printfield:
     ; depends only on
     ; - field label for start of field
 
-    lda #<field
+    lda ZP_PTR_FIELD
     sta ZP_PTR_1
-    lda #>field
+    lda ZP_PTR_FIELD+1
     sta ZP_PTR_1+1
     ldx #0 ; row counter
 @nextrow:
