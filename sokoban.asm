@@ -10,11 +10,23 @@ NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 10
+
+; screen 16x16bit tile width/height
+SCREENWIDTH = 20
+SCREENHEIGHT = 15
+
 .org $080D
 .segment "STARTUP"
 .segment "INIT"
 .segment "ONCE"
 .segment "CODE"
+
+; VERA Registers
+VERA_LOW            = $9F20
+VERA_MID            = $9F21
+VERA_HIGH           = $9F22
+VERA_DATA0          = $9F23
+VERA_CTRL           = $9F25
 
    jmp start
 
@@ -29,13 +41,15 @@ winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
 
-currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+currentlevel:   .byte 1 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 no_levels:      .byte 0 ; will be read by initfield
 no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 no_goalsreached:.byte 0 ; static now, reset for each game
 fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
 fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
 
+vera_byte_low:  .byte 0
+vera_byte_mid: .byte 0
 ; usage of zeropage pointers:
 ; ZP_PTR_1 - temporary pointer
 ; ZP_PTR_2 - temporary pointer
@@ -72,6 +86,8 @@ start:
     rts ; exit program
 @next:
     jsr initfield
+    jsr printfield2
+    rts
     ;lda no_levels
     ;jsr printdecimal
     ;rts
@@ -619,3 +635,420 @@ cls:
     lda #CLEARSCREEN
     jsr CHROUT
     rts
+
+printfield2:
+;*******************************************************************************
+; Section 2 - Build a 16x16 256 color tile in VRAM location $12000
+;*******************************************************************************
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$11
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
+    lda #$20
+    sta VERA_MID                        ; Set Middle Byte to $20
+    stz VERA_LOW                        ; Set Low Byte to $00
+
+    ldx #0
+:   lda tiledata,x                         ; read from Brick Data
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+    ; load Brick data
+    ldx #0
+:   lda Brick,x                         ; read from Brick Data
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+    ; load player data
+    ldx #0
+:   lda player,x                         ; read from Brick Data
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+    ; load crate data
+    ldx #0
+:   lda crate,x                         ; read from Brick Data
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+    ; load goal data
+    ldx #0
+:   lda goal,x                         ; read from Brick Data
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+
+
+;*******************************************************************************
+; Section 3 - Configure Layer 0
+;*******************************************************************************
+    lda #%00000011                      ; 32 x 32 tiles, 8 bits per pixel
+    sta $9F2D
+    lda #$20                            ; $20 points to $4000 in VRAM
+    sta $9F2E                           ; Store to Map Base Pointer
+
+    lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
+    sta $9F2F                           ; Store to Tile Base Pointer
+
+;*******************************************************************************
+; Section 4 - Fill the Layer 0 with all zeros (black)
+;*******************************************************************************
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    lda #$40
+    sta VERA_MID                        ; Set Middle Byte to $40
+    lda #$0
+    sta VERA_LOW                        ; Set Low Byte to $00
+
+    lda #0
+    sta VERA_DATA0
+    sta VERA_DATA0
+
+    ldy #32
+    lda #0
+:   ldx #32
+:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    sta VERA_DATA0                      ; Write Attribute
+    dex
+    bne :-
+    dey
+    bne :--
+
+; prep variables for vera med/high bytes
+;    topleft address for first tile is 0x04000
+    lda #$40
+    sta vera_byte_mid
+    stz vera_byte_low
+
+; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
+    lda #SCREENWIDTH
+    sec
+    sbc fieldwidth
+    sta vera_byte_low
+
+; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
+    lda #SCREENHEIGHT
+    sec
+    sbc fieldheight
+    lsr ; /2
+    tax ; transfer to counter
+@loop:
+    cpx #$0
+    beq @done ; exit loop when x == 0
+    lda vera_byte_low
+    clc
+    adc #$40    ; add row ADDRESS height for exactly one row down
+    sta vera_byte_low
+    bcc @decrement  ; no need to change the high byte
+    lda vera_byte_mid
+    adc #$0     ; add carry (so +1)
+    sta vera_byte_mid
+@decrement: ; next row
+    dex
+    bra @loop
+@done:
+    ; DEBUG CODE
+
+;    stz VERA_CTRL                       ; Use Data Register 0
+;    lda #$10
+;    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+;    lda vera_byte_mid
+;    sta VERA_MID                        ; Set Middle Byte to $40
+;    lda vera_byte_low
+;    sta VERA_LOW                        ; Set Low Byte to $00
+
+
+;    ; test - place only single 16x16 tile at start of screen field
+;    lda #$1
+;    sta VERA_DATA0
+;    stz VERA_DATA0
+    
+; First, prepare the pointers to the back-end field data
+    lda ZP_PTR_FIELD
+    sta ZP_PTR_1
+    lda ZP_PTR_FIELD+1
+    sta ZP_PTR_1+1
+
+    ldx #0 ; row counter
+;    ldx #5 ; DEBUGGGGGGG : only two lines (7-5)
+@nextrow:
+    ldy #0 ; column counter
+    ; prepare vera pointers for this row
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    lda vera_byte_mid
+    sta VERA_MID                        ; Set Middle Byte to $40
+    lda vera_byte_low
+    sta VERA_LOW                        ; Set Low Byte to $00
+
+@row:
+    lda (ZP_PTR_1),y
+    cmp #'@'
+    beq @player
+    cmp #'+'
+    beq @player
+    cmp #'$'
+    beq @crate
+    cmp #'.'
+    beq @goal
+    cmp #'*'
+    beq @crate
+    cmp #' '
+    beq @ignore
+    cmp #0
+    beq @ignore
+    bra @wall
+@ignore:
+    ; ignore
+    lda #$0 ; black tile
+    sta VERA_DATA0
+    stz VERA_DATA0
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@player:
+    lda #$2
+    sta VERA_DATA0
+    stz VERA_DATA0
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@crate:
+    lda #$3
+    sta VERA_DATA0
+    stz VERA_DATA0
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@goal:
+    lda #$4
+    sta VERA_DATA0
+    stz VERA_DATA0
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+
+@wall:
+    lda #$1 ; load tile 1 ; brick
+    sta VERA_DATA0
+    stz VERA_DATA0
+
+    iny
+    cpy fieldwidth
+    bne @row
+@endline:
+    ; advance pointer to next row
+    lda ZP_PTR_1
+    clc
+    adc fieldwidth
+    sta ZP_PTR_1
+    bcc @checklastrow ; no carry, don't increment high byte on pointer
+    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+    clc
+    adc #1
+    sta ZP_PTR_1+1
+@checklastrow:
+    ; last row?
+    ; increment vera pointer to next row
+    lda vera_byte_low
+    clc
+    adc #$40    ; add 40 - address to next row
+    sta vera_byte_low
+    bcc @next3  ; no need to change the high byte
+    lda vera_byte_mid
+    adc #$0     ; add carry (so +1)
+    sta vera_byte_mid
+@next3:
+;    ; decrement low byte by fieldwidth (twice because of argument field)
+;    lda vera_byte_low
+;    sec
+;    sbc fieldwidth
+;    sbc fieldwidth
+;    sta vera_byte_low
+;    bcs @next4  ; no need to change the high byte
+;    lda vera_byte_mid
+;    sbc #$0
+;    sta vera_byte_mid
+@next4:
+
+    inx
+    cpx fieldheight
+    beq @nextsection
+
+    jmp @nextrow
+@nextsection:
+
+;*******************************************************************************
+; Section 5 - Turn on Layer 0
+;*******************************************************************************
+    lda $9F29
+    ora #%00110000                      ; Bits 4 and 5 are set to 1
+    sta $9F29                           ; So both Later 0 and 1 are turned on
+
+
+;*******************************************************************************
+; Section 6 - Change Layer 1 to 256 Color Mode
+;*******************************************************************************
+    lda $9F34
+    ora #%001000                        ; Set bit 3 to 1, rest unchanged
+    sta $9F34
+
+
+;*******************************************************************************
+; Section 7 - Clear Layer 1
+;*******************************************************************************
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    stz VERA_MID                        ; Set Middle Byte to $00
+    stz VERA_LOW                        ; Set Low Byte to $00
+
+    lda #30
+    sta $02                             ; save counter for rows
+    ldy #$01                            ; Color Attribute white on black background
+    lda #$20                            ; Blank character
+    ldx #0
+:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    sty VERA_DATA0                      ; Write Attribute
+    inx
+    bne :-
+    dec $02
+    bne :-
+
+
+;*******************************************************************************
+; Section 9 - Scale Display x2 for resolution of 320 x 240 pixels
+;*******************************************************************************
+    lda #$40
+    sta $9F2A
+    sta $9F2B
+
+
+    rts
+
+tiledata:
+black:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+Brick:
+    .byte 8,8,8,8,8,8,8,229,8,8,8,8,8,8,8,8
+    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
+    .byte 42,42,42,42,42,42,41,229,8,42,44,42,42,42,42,42
+    .byte 42,42,44,44,42,42,41,229,8,42,42,42,42,42,42,42
+    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
+    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,41,41,42
+    .byte 41,41,41,41,41,41,41,229,8,41,41,41,41,41,41,41
+    .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
+    .byte 229,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8
+    .byte 229,8,8,42,44,44,42,42,42,42,42,42,42,42,42,41
+    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
+    .byte 229,8,42,42,42,42,41,41,42,42,42,42,42,42,42,41
+    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,41,42,41
+    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
+    .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
+    .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
+player2_corrupt:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+crate_corrupt:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+goal:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+player:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+crate:
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
