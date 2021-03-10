@@ -40,27 +40,19 @@ filename_end:
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
-
-currentlevel:   .byte 1 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 no_levels:      .byte 0 ; will be read by initfield
 no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 no_goalsreached:.byte 0 ; static now, reset for each game
 fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
 fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
-
 vera_byte_low:  .byte 0
 vera_byte_mid: .byte 0
+
 ; usage of zeropage pointers:
 ; ZP_PTR_1 - temporary pointer
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
-
-ZP_VERA_PMID = $28; position of player (mid byte) in vera memory
-ZP_VERA_PLOW = $2a; position of player (low byte) in vera memory
-ZP_VERA_T1MID = $2c; temp1 to vera memory
-ZP_VERA_T1LOW = $2e; temp1 to vera memory
-ZP_VERA_T2MID = $30; temp2 to vera memory
-ZP_VERA_T2LOW = $32; temp2 to vera memory
 
 loadfield:
     ; loads all fields from the file 'LEVELS.BIN'
@@ -96,13 +88,6 @@ start:
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
     jsr printfield2
-;    rts
-    ;lda no_levels
-    ;jsr printdecimal
-    ;rts
-    ;jsr selectlevel
-;    jsr cls
-;    jsr printfield
 
 keyloop:
     jsr GETIN
@@ -303,8 +288,6 @@ handlemove:
     jsr moveplayeronfield
     jsr moveplayerposition
 
-;    jsr cls
-;    jsr printfield
     jsr printfield2
 @done:
     rts
@@ -627,9 +610,7 @@ cls:
     rts
 
 loadtiles:
-;*******************************************************************************
-; Section 2 - Build a 16x16 256 color tile in VRAM location $12000
-;*******************************************************************************
+; Build  16x16 256 color tiles in VRAM location $12000
     stz VERA_CTRL                       ; Use Data Register 0
     lda #$11
     sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
@@ -676,9 +657,7 @@ loadtiles:
     rts
 
 layerconfig:
-;*******************************************************************************
-; Section 3 - Configure Layer 0
-;*******************************************************************************
+; Configure Layer 0
     lda #%00000011                      ; 32 x 32 tiles, 8 bits per pixel
     sta $9F2D
     lda #$20                            ; $20 points to $4000 in VRAM
@@ -687,9 +666,7 @@ layerconfig:
     lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
     sta $9F2F                           ; Store to Tile Base Pointer
 
-;*******************************************************************************
-; Section 4 - Fill the Layer 0 with all zeros (black)
-;*******************************************************************************
+; Fill the Layer 0 with all zeros (black)
     stz VERA_CTRL                       ; Use Data Register 0
     lda #$10
     sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
@@ -711,25 +688,18 @@ layerconfig:
     bne :-
     dey
     bne :--
-;*******************************************************************************
-; Section 5 - Turn on Layer 0
-;*******************************************************************************
+
+; Turn on Layer 0
     lda $9F29
     ora #%00110000                      ; Bits 4 and 5 are set to 1
     sta $9F29                           ; So both Later 0 and 1 are turned on
 
-
-;*******************************************************************************
-; Section 6 - Change Layer 1 to 256 Color Mode
-;*******************************************************************************
+; Change Layer 1 to 256 Color Mode
     lda $9F34
     ora #%001000                        ; Set bit 3 to 1, rest unchanged
     sta $9F34
 
-
-;*******************************************************************************
-; Section 7 - Clear Layer 1
-;*******************************************************************************
+; Clear Layer 1
     stz VERA_CTRL                       ; Use Data Register 0
     lda #$10
     sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
@@ -748,10 +718,7 @@ layerconfig:
     dec $02
     bne :-
 
-
-;*******************************************************************************
-; Section 9 - Scale Display x2 for resolution of 320 x 240 pixels
-;*******************************************************************************
+; Scale Display x2 for resolution of 320 x 240 pixels
     lda #$40
     sta $9F2A
     sta $9F2B
@@ -792,22 +759,7 @@ printfield2:
     dex
     bra @loop
 @done:
-    ; DEBUG CODE
 
-;    stz VERA_CTRL                       ; Use Data Register 0
-;    lda #$10
-;    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-;    lda vera_byte_mid
-;    sta VERA_MID                        ; Set Middle Byte to $40
-;    lda vera_byte_low
-;    sta VERA_LOW                        ; Set Low Byte to $00
-
-
-;    ; test - place only single 16x16 tile at start of screen field
-;    lda #$1
-;    sta VERA_DATA0
-;    stz VERA_DATA0
-    
 ; First, prepare the pointers to the back-end field data
     lda ZP_PTR_FIELD
     sta ZP_PTR_1
@@ -815,7 +767,6 @@ printfield2:
     sta ZP_PTR_1+1
 
     ldx #0 ; row counter
-;    ldx #5 ; DEBUGGGGGGG : only two lines (7-5)
 @nextrow:
     ldy #0 ; column counter
     ; prepare vera pointers for this row
@@ -917,25 +868,12 @@ printfield2:
     adc #$0     ; add carry (so +1)
     sta vera_byte_mid
 @next3:
-;    ; decrement low byte by fieldwidth (twice because of argument field)
-;    lda vera_byte_low
-;    sec
-;    sbc fieldwidth
-;    sbc fieldwidth
-;    sta vera_byte_low
-;    bcs @next4  ; no need to change the high byte
-;    lda vera_byte_mid
-;    sbc #$0
-;    sta vera_byte_mid
-@next4:
-
     inx
     cpx fieldheight
     beq @nextsection
 
     jmp @nextrow
 @nextsection:
-
     rts
 
 tiledata:
@@ -974,40 +912,8 @@ Brick:
     .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
     .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
 player:
-;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 .incbin "player.bin"
 crate:
-;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 .incbin "crate.bin"
 goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0

@@ -297,27 +297,19 @@ Current file: sokoban.asm
 000862  1  43 48 45 44  
 000868  1               
 000868  1               ; variables that the program uses during execution
-000868  1               
-000868  1  01           currentlevel:   .byte 1 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+000868  1  03           currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 000869  1  00           no_levels:      .byte 0 ; will be read by initfield
 00086A  1  00           no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 00086B  1  00           no_goalsreached:.byte 0 ; static now, reset for each game
 00086C  1  00           fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
 00086D  1  00           fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
-00086E  1               
 00086E  1  00           vera_byte_low:  .byte 0
 00086F  1  00           vera_byte_mid: .byte 0
+000870  1               
 000870  1               ; usage of zeropage pointers:
 000870  1               ; ZP_PTR_1 - temporary pointer
 000870  1               ; ZP_PTR_2 - temporary pointer
 000870  1               ; ZP_PTR_3 - position of player
-000870  1               
-000870  1               ZP_VERA_PMID = $28; position of player (mid byte) in vera memory
-000870  1               ZP_VERA_PLOW = $2a; position of player (low byte) in vera memory
-000870  1               ZP_VERA_T1MID = $2c; temp1 to vera memory
-000870  1               ZP_VERA_T1LOW = $2e; temp1 to vera memory
-000870  1               ZP_VERA_T2MID = $30; temp2 to vera memory
-000870  1               ZP_VERA_T2LOW = $32; temp2 to vera memory
 000870  1               
 000870  1               loadfield:
 000870  1                   ; loads all fields from the file 'LEVELS.BIN'
@@ -353,13 +345,6 @@ Current file: sokoban.asm
 0008A1  1  20 6E 0B         jsr loadtiles       ; load tiles from normal memory to VRAM
 0008A4  1  20 C1 0B         jsr layerconfig     ; configure layer 0/1 on screen
 0008A7  1  20 3A 0C         jsr printfield2
-0008AA  1               ;    rts
-0008AA  1                   ;lda no_levels
-0008AA  1                   ;jsr printdecimal
-0008AA  1                   ;rts
-0008AA  1                   ;jsr selectlevel
-0008AA  1               ;    jsr cls
-0008AA  1               ;    jsr printfield
 0008AA  1               
 0008AA  1               keyloop:
 0008AA  1  20 E4 FF         jsr GETIN
@@ -560,8 +545,6 @@ Current file: sokoban.asm
 0009A9  1  20 FD 09         jsr moveplayeronfield
 0009AC  1  20 B3 09         jsr moveplayerposition
 0009AF  1               
-0009AF  1               ;    jsr cls
-0009AF  1               ;    jsr printfield
 0009AF  1  20 3A 0C         jsr printfield2
 0009B2  1               @done:
 0009B2  1  60               rts
@@ -884,9 +867,7 @@ Current file: sokoban.asm
 000B6D  1  60               rts
 000B6E  1               
 000B6E  1               loadtiles:
-000B6E  1               ;*******************************************************************************
-000B6E  1               ; Section 2 - Build a 16x16 256 color tile in VRAM location $12000
-000B6E  1               ;*******************************************************************************
+000B6E  1               ; Build  16x16 256 color tiles in VRAM location $12000
 000B6E  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
 000B71  1  A9 11            lda #$11
 000B73  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
@@ -933,9 +914,7 @@ Current file: sokoban.asm
 000BC0  1  60               rts
 000BC1  1               
 000BC1  1               layerconfig:
-000BC1  1               ;*******************************************************************************
-000BC1  1               ; Section 3 - Configure Layer 0
-000BC1  1               ;*******************************************************************************
+000BC1  1               ; Configure Layer 0
 000BC1  1  A9 03            lda #%00000011                      ; 32 x 32 tiles, 8 bits per pixel
 000BC3  1  8D 2D 9F         sta $9F2D
 000BC6  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
@@ -944,9 +923,7 @@ Current file: sokoban.asm
 000BCB  1  A9 93            lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
 000BCD  1  8D 2F 9F         sta $9F2F                           ; Store to Tile Base Pointer
 000BD0  1               
-000BD0  1               ;*******************************************************************************
-000BD0  1               ; Section 4 - Fill the Layer 0 with all zeros (black)
-000BD0  1               ;*******************************************************************************
+000BD0  1               ; Fill the Layer 0 with all zeros (black)
 000BD0  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
 000BD3  1  A9 10            lda #$10
 000BD5  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
@@ -968,25 +945,18 @@ Current file: sokoban.asm
 000BF7  1  D0 F7            bne :-
 000BF9  1  88               dey
 000BFA  1  D0 F2            bne :--
-000BFC  1               ;*******************************************************************************
-000BFC  1               ; Section 5 - Turn on Layer 0
-000BFC  1               ;*******************************************************************************
+000BFC  1               
+000BFC  1               ; Turn on Layer 0
 000BFC  1  AD 29 9F         lda $9F29
 000BFF  1  09 30            ora #%00110000                      ; Bits 4 and 5 are set to 1
 000C01  1  8D 29 9F         sta $9F29                           ; So both Later 0 and 1 are turned on
 000C04  1               
-000C04  1               
-000C04  1               ;*******************************************************************************
-000C04  1               ; Section 6 - Change Layer 1 to 256 Color Mode
-000C04  1               ;*******************************************************************************
+000C04  1               ; Change Layer 1 to 256 Color Mode
 000C04  1  AD 34 9F         lda $9F34
 000C07  1  09 08            ora #%001000                        ; Set bit 3 to 1, rest unchanged
 000C09  1  8D 34 9F         sta $9F34
 000C0C  1               
-000C0C  1               
-000C0C  1               ;*******************************************************************************
-000C0C  1               ; Section 7 - Clear Layer 1
-000C0C  1               ;*******************************************************************************
+000C0C  1               ; Clear Layer 1
 000C0C  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
 000C0F  1  A9 10            lda #$10
 000C11  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
@@ -1005,10 +975,7 @@ Current file: sokoban.asm
 000C2D  1  C6 02            dec $02
 000C2F  1  D0 F3            bne :-
 000C31  1               
-000C31  1               
-000C31  1               ;*******************************************************************************
-000C31  1               ; Section 9 - Scale Display x2 for resolution of 320 x 240 pixels
-000C31  1               ;*******************************************************************************
+000C31  1               ; Scale Display x2 for resolution of 320 x 240 pixels
 000C31  1  A9 40            lda #$40
 000C33  1  8D 2A 9F         sta $9F2A
 000C36  1  8D 2B 9F         sta $9F2B
@@ -1049,21 +1016,6 @@ Current file: sokoban.asm
 000C6A  1  CA               dex
 000C6B  1  80 E6            bra @loop
 000C6D  1               @done:
-000C6D  1                   ; DEBUG CODE
-000C6D  1               
-000C6D  1               ;    stz VERA_CTRL                       ; Use Data Register 0
-000C6D  1               ;    lda #$10
-000C6D  1               ;    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000C6D  1               ;    lda vera_byte_mid
-000C6D  1               ;    sta VERA_MID                        ; Set Middle Byte to $40
-000C6D  1               ;    lda vera_byte_low
-000C6D  1               ;    sta VERA_LOW                        ; Set Low Byte to $00
-000C6D  1               
-000C6D  1               
-000C6D  1               ;    ; test - place only single 16x16 tile at start of screen field
-000C6D  1               ;    lda #$1
-000C6D  1               ;    sta VERA_DATA0
-000C6D  1               ;    stz VERA_DATA0
 000C6D  1               
 000C6D  1               ; First, prepare the pointers to the back-end field data
 000C6D  1  A5 28            lda ZP_PTR_FIELD
@@ -1072,7 +1024,6 @@ Current file: sokoban.asm
 000C73  1  85 01            sta ZP_PTR_1+1
 000C75  1               
 000C75  1  A2 00            ldx #0 ; row counter
-000C77  1               ;    ldx #5 ; DEBUGGGGGGG : only two lines (7-5)
 000C77  1               @nextrow:
 000C77  1  A0 00            ldy #0 ; column counter
 000C79  1                   ; prepare vera pointers for this row
@@ -1174,25 +1125,12 @@ Current file: sokoban.asm
 000D2A  1  69 00            adc #$0     ; add carry (so +1)
 000D2C  1  8D 6F 08         sta vera_byte_mid
 000D2F  1               @next3:
-000D2F  1               ;    ; decrement low byte by fieldwidth (twice because of argument field)
-000D2F  1               ;    lda vera_byte_low
-000D2F  1               ;    sec
-000D2F  1               ;    sbc fieldwidth
-000D2F  1               ;    sbc fieldwidth
-000D2F  1               ;    sta vera_byte_low
-000D2F  1               ;    bcs @next4  ; no need to change the high byte
-000D2F  1               ;    lda vera_byte_mid
-000D2F  1               ;    sbc #$0
-000D2F  1               ;    sta vera_byte_mid
-000D2F  1               @next4:
-000D2F  1               
 000D2F  1  E8               inx
 000D30  1  EC 6D 08         cpx fieldheight
 000D33  1  F0 03            beq @nextsection
 000D35  1               
 000D35  1  4C 77 0C         jmp @nextrow
 000D38  1               @nextsection:
-000D38  1               
 000D38  1  60               rts
 000D39  1               
 000D39  1               tiledata:
@@ -1295,42 +1233,10 @@ Current file: sokoban.asm
 000F2D  1  E5 E5 E5 E5  
 000F31  1  E5 E5 E5 E5  
 000F39  1               player:
-000F39  1               ;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000F39  1               ;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-000F39  1               ;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-000F39  1               ;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 000F39  1  00 00 00 00  .incbin "player.bin"
 000F3D  1  00 10 10 10  
 000F41  1  10 0B 00 00  
 001039  1               crate:
-001039  1               ;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001039  1               ;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-001039  1               ;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-001039  1               ;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-001039  1               ;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-001039  1               ;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-001039  1               ;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-001039  1               ;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-001039  1               ;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-001039  1               ;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 001039  1  57 57 57 57  .incbin "crate.bin"
 00103D  1  57 57 57 57  
 001041  1  57 57 57 57  
