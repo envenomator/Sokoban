@@ -5,7 +5,7 @@
 ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 
-LOADSTART = $1000;
+LOADSTART = $2000;
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
@@ -55,6 +55,13 @@ vera_byte_mid: .byte 0
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
 
+ZP_VERA_PMID = $28; position of player (mid byte) in vera memory
+ZP_VERA_PLOW = $2a; position of player (low byte) in vera memory
+ZP_VERA_T1MID = $2c; temp1 to vera memory
+ZP_VERA_T1LOW = $2e; temp1 to vera memory
+ZP_VERA_T2MID = $30; temp2 to vera memory
+ZP_VERA_T2LOW = $32; temp2 to vera memory
+
 loadfield:
     ; loads all fields from the file 'LEVELS.BIN'
     lda #filename_end - filename
@@ -85,15 +92,17 @@ start:
     jsr printline
     rts ; exit program
 @next:
-    jsr initfield
+    jsr initfield       ; load correct startup values for selected field
+    jsr loadtiles       ; load tiles from normal memory to VRAM
+    jsr layerconfig     ; configure layer 0/1 on screen
     jsr printfield2
-    rts
+;    rts
     ;lda no_levels
     ;jsr printdecimal
     ;rts
     ;jsr selectlevel
-    jsr cls
-    jsr printfield
+;    jsr cls
+;    jsr printfield
 
 keyloop:
     jsr GETIN
@@ -270,7 +279,8 @@ handlemove:
     jsr moveplayerposition
 
     jsr cls
-    jsr printfield
+;    jsr printfield
+    jsr printfield2
 
     rts
 @next:
@@ -293,8 +303,9 @@ handlemove:
     jsr moveplayeronfield
     jsr moveplayerposition
 
-    jsr cls
-    jsr printfield
+;    jsr cls
+;    jsr printfield
+    jsr printfield2
 @done:
     rts
 
@@ -541,27 +552,6 @@ initfield:
     lda (ZP_PTR_1),y
     sta ZP_PTR_3+1
 
-    ; advance player to the field
-;    lda $100a
-;    sta ZP_PTR_3
-;    lda $100b
-;    sta ZP_PTR_3+1
-;    lda #$16
-;    sta ZP_PTR_3
-;    lda #$10
-;    sta ZP_PTR_3+1
-
-    ; load fieldwidth from load area
-;    lda $1004
-;    sta fieldwidth
-
-    ; load fieldheight from load area
-;    lda $1006
-;    sta fieldheight
-
-    ; load goals from load area
-;    lda $1008
-;    sta no_goals
     rts
 
 printfield:
@@ -636,7 +626,7 @@ cls:
     jsr CHROUT
     rts
 
-printfield2:
+loadtiles:
 ;*******************************************************************************
 ; Section 2 - Build a 16x16 256 color tile in VRAM location $12000
 ;*******************************************************************************
@@ -648,36 +638,44 @@ printfield2:
     stz VERA_LOW                        ; Set Low Byte to $00
 
     ldx #0
-:   lda tiledata,x                         ; read from Brick Data
+:   lda tiledata,x                      ; index 0 / black tile
     sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     inx
     bne :-
     ; load Brick data
     ldx #0
-:   lda Brick,x                         ; read from Brick Data
+:   lda Brick,x                         ; index 1 / brick
     sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     inx
     bne :-
     ; load player data
     ldx #0
-:   lda player,x                         ; read from Brick Data
+:   lda player,x                        ; index 2 / player
     sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     inx
     bne :-
     ; load crate data
     ldx #0
-:   lda crate,x                         ; read from Brick Data
+:   lda crate,x                         ; index 3 / crate (normal)
     sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     inx
     bne :-
     ; load goal data
     ldx #0
-:   lda goal,x                         ; read from Brick Data
+:   lda goal,x                         ; index 4 / goal (normal)
     sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     inx
     bne :-
+    ; load crateongoal data
+    ldx #0
+:   lda crateongoal,x                   ; index 5 / crate on goal
+    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    inx
+    bne :-
+    
+    rts
 
-
+layerconfig:
 ;*******************************************************************************
 ; Section 3 - Configure Layer 0
 ;*******************************************************************************
@@ -713,7 +711,54 @@ printfield2:
     bne :-
     dey
     bne :--
+;*******************************************************************************
+; Section 5 - Turn on Layer 0
+;*******************************************************************************
+    lda $9F29
+    ora #%00110000                      ; Bits 4 and 5 are set to 1
+    sta $9F29                           ; So both Later 0 and 1 are turned on
 
+
+;*******************************************************************************
+; Section 6 - Change Layer 1 to 256 Color Mode
+;*******************************************************************************
+    lda $9F34
+    ora #%001000                        ; Set bit 3 to 1, rest unchanged
+    sta $9F34
+
+
+;*******************************************************************************
+; Section 7 - Clear Layer 1
+;*******************************************************************************
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    stz VERA_MID                        ; Set Middle Byte to $00
+    stz VERA_LOW                        ; Set Low Byte to $00
+
+    lda #30
+    sta $02                             ; save counter for rows
+    ldy #$01                            ; Color Attribute white on black background
+    lda #$20                            ; Blank character
+    ldx #0
+:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    sty VERA_DATA0                      ; Write Attribute
+    inx
+    bne :-
+    dec $02
+    bne :-
+
+
+;*******************************************************************************
+; Section 9 - Scale Display x2 for resolution of 320 x 240 pixels
+;*******************************************************************************
+    lda #$40
+    sta $9F2A
+    sta $9F2B
+
+    rts
+
+printfield2:
 ; prep variables for vera med/high bytes
 ;    topleft address for first tile is 0x04000
     lda #$40
@@ -793,7 +838,7 @@ printfield2:
     cmp #'.'
     beq @goal
     cmp #'*'
-    beq @crate
+    beq @crateongoal
     cmp #' '
     beq @ignore
     cmp #0
@@ -818,6 +863,14 @@ printfield2:
     bra @endline
 @crate:
     lda #$3
+    sta VERA_DATA0
+    stz VERA_DATA0
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@crateongoal:
+    lda #$5
     sta VERA_DATA0
     stz VERA_DATA0
     iny
@@ -883,52 +936,6 @@ printfield2:
     jmp @nextrow
 @nextsection:
 
-;*******************************************************************************
-; Section 5 - Turn on Layer 0
-;*******************************************************************************
-    lda $9F29
-    ora #%00110000                      ; Bits 4 and 5 are set to 1
-    sta $9F29                           ; So both Later 0 and 1 are turned on
-
-
-;*******************************************************************************
-; Section 6 - Change Layer 1 to 256 Color Mode
-;*******************************************************************************
-    lda $9F34
-    ora #%001000                        ; Set bit 3 to 1, rest unchanged
-    sta $9F34
-
-
-;*******************************************************************************
-; Section 7 - Clear Layer 1
-;*******************************************************************************
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    stz VERA_MID                        ; Set Middle Byte to $00
-    stz VERA_LOW                        ; Set Low Byte to $00
-
-    lda #30
-    sta $02                             ; save counter for rows
-    ldy #$01                            ; Color Attribute white on black background
-    lda #$20                            ; Blank character
-    ldx #0
-:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    sty VERA_DATA0                      ; Write Attribute
-    inx
-    bne :-
-    dec $02
-    bne :-
-
-
-;*******************************************************************************
-; Section 9 - Scale Display x2 for resolution of 320 x 240 pixels
-;*******************************************************************************
-    lda #$40
-    sta $9F2A
-    sta $9F2B
-
-
     rts
 
 tiledata:
@@ -966,40 +973,42 @@ Brick:
     .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
     .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
     .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
-player2_corrupt:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-crate_corrupt:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+player:
+;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+.incbin "player.bin"
+crate:
+;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
+;    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
+;    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
+;    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
+;    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
+;    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
+;    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+.incbin "crate.bin"
 goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -1007,48 +1016,15 @@ goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-player:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-crate:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0
-    .byte 0,1,0,0,0,0,1,0,0,1,0,0,0,0,1,0
-    .byte 0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0
-    .byte 0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0
-    .byte 0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0
-    .byte 0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0
-    .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
+crateongoal:
+.incbin "crateongoal.bin"

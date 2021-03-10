@@ -5,7 +5,7 @@
 #include <string.h>
 #include <math.h>
 
-#define LOADADDRESS 0x1000
+#define LOADADDRESS 0x2000
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
