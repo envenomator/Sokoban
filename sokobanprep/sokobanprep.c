@@ -5,7 +5,7 @@
 #include <string.h>
 #include <math.h>
 
-#define LOADADDRESS 0x2000
+#define LOADADDRESS 0xa000  // RAM Bank 0
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128

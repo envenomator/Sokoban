@@ -250,7 +250,7 @@ Current file: sokoban.asm
 000000r 1               ZP_PTR_FIELD = $28
 000000r 1               temp = $30  ; used for temp 8/16 bit storage $30/$31
 000000r 1               
-000000r 1               LOADSTART = $2000;
+000000r 1               LOADSTART = $a000;
 000000r 1               NEWLINE = $0D
 000000r 1               UPPERCASE = $8E
 000000r 1               CLEARSCREEN = 147
@@ -297,7 +297,7 @@ Current file: sokoban.asm
 000862  1  43 48 45 44  
 000868  1               
 000868  1               ; variables that the program uses during execution
-000868  1  03           currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+000868  1  02           currentlevel:   .byte 2 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 000869  1  00           no_levels:      .byte 0 ; will be read by initfield
 00086A  1  00           no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 00086B  1  00           no_goalsreached:.byte 0 ; static now, reset for each game
@@ -739,7 +739,7 @@ Current file: sokoban.asm
 000AA9  1                   ; load 1st pointer to temp pointer ZP_PTR_1
 000AA9  1  A9 00            lda #<LOADSTART
 000AAB  1  85 00            sta ZP_PTR_1
-000AAD  1  A9 20            lda #>LOADSTART
+000AAD  1  A9 A0            lda #>LOADSTART
 000AAF  1  85 01            sta ZP_PTR_1+1
 000AB1  1               
 000AB1  1                   ; first load number of levels, pointed to by ZP_PTR_1,0

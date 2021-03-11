@@ -5,7 +5,7 @@
 ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 
-LOADSTART = $2000;
+LOADSTART = $a000;
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
@@ -40,7 +40,7 @@ filename_end:
 winstatement: .byte "goal reached!",0
 
 ; variables that the program uses during execution
-currentlevel:   .byte 3 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+currentlevel:   .byte 2 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 no_levels:      .byte 0 ; will be read by initfield
 no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 no_goalsreached:.byte 0 ; static now, reset for each game
