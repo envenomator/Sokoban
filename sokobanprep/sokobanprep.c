@@ -9,6 +9,9 @@
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
+#define MAXWIDTH 20
+#define MAXHEIGHT 15
+
 char linebuffer[BUFFERSIZE];
 
 int getplayerpos(char *string);
@@ -166,7 +169,7 @@ int main(int argc, char *argv[])
         {
             outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
             // empty line, or payload?
-            printf("%d\n",outputlength);
+            //printf("%d\n",outputlength);
             if(outputlength)
             {
                 //fprintf(outptr,"%s",linebuffer);
@@ -179,6 +182,13 @@ int main(int argc, char *argv[])
                 }
             }
         }
+    }
+
+    // output any too big levels here
+    for(int n = 0; n < numlevels; n++)
+    {
+        if(levelheight[n] > MAXHEIGHT) printf("ERROR: Level %d too high\n",n+1);
+        if(levelwidth[n] > MAXWIDTH) printf("ERROR: Level %d too wide\n", n+1);
     }
 
     free(levelheight);

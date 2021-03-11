@@ -31,16 +31,17 @@ VERA_CTRL           = $9F25
    jmp start
 
 ; string constants
-message:      .byte "press a key",0
-selectmessage:.byte "select a level: ",0
-errormessage: .byte "error loading file",0
-quitmessage:  .byte "press q to quit",0
-filename:     .byte "levels.bin"
+message:          .byte "press a key",0
+selectmessage:    .byte "select a level (",0
+selectendmessage: .byte "): ",0
+errormessage:     .byte "error loading file",0
+quitmessage:      .byte "press q to quit",0
+filename:         .byte "levels.bin"
 filename_end:
-winstatement: .byte "goal reached!",0
+winstatement:     .byte "goal reached!",0
 
 ; variables that the program uses during execution
-currentlevel:   .byte 2 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+currentlevel:   .byte 1 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 no_levels:      .byte 0 ; will be read by initfield
 no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
 no_goalsreached:.byte 0 ; static now, reset for each game
@@ -73,7 +74,7 @@ start:
     ; force uppercase
     lda #UPPERCASE
     jsr CHROUT
-    
+
     jsr loadfield
     bcc @next
     ; error
@@ -84,9 +85,12 @@ start:
     jsr printline
     rts ; exit program
 @next:
-    jsr initfield       ; load correct startup values for selected field
+    jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
+
+    jsr selectlevel
+    jsr initfield       ; load correct startup values for selected field
     jsr printfield2
 
 keyloop:
@@ -452,28 +456,70 @@ printdecimal:
     rts
 
 selectlevel:
+    lda #1 ; start out with first level
+    sta currentlevel
+
+@mainloop:
+    jsr cls
+    ; print selection message
     lda #<selectmessage
     sta ZP_PTR_1
     lda #>selectmessage
     sta ZP_PTR_1+1
     jsr print
+    ; print range
+    jsr CHROUT
+    lda #'1'
+    jsr CHROUT
+    lda #'-'
+    jsr CHROUT
+    lda no_levels
+    jsr printdecimal
+    lda #<selectendmessage
+    sta ZP_PTR_1
+    lda #>selectendmessage
+    sta ZP_PTR_1+1
+    jsr print
+    ; print level number
+    lda currentlevel
+    jsr printdecimal
 
-@wait:
-    jsr GETIN   ; get character from the buffer
-    cmp #0
-    beq @wait
-
-    cmp #$31 ; petscii '1'
-    bcc @wait
-    cmp #$34 ; petscii '4'
-    bcs @wait
-    ; now between 1-3
-    sec
-    sbc #$30
-    sta currentlevel
+@charloop:
+    jsr GETIN
+@checkdown:
+    cmp #$11 ; down pressed
+    beq @down
+    cmp #$9d ; left pressed
+    beq @down
+    bra @checkup
+@down:
+    ; down key pressed
+    lda currentlevel
+    cmp #1
+    beq @charloop   ; lowest value == 1
+    dec currentlevel
+    bra @mainloop
+@checkup:
+    cmp #$91 ; up pressed
+    beq @up
+    cmp #$1d ; right pressed
+    beq @up
+    bra @checkreturnkey
+@up:
+    ; up key pressed
+    lda currentlevel
+    cmp no_levels
+    beq @charloop   ; maximum value reached
+    inc currentlevel
+    bra @mainloop
+@checkreturnkey:
+    cmp #$0d
+    bne @charloop
+    ; return key pressed - select this level
+    jsr cls
     rts
 
-initfield:
+resetvars:
     ; reset goals
     lda #0
     sta no_goalsreached
@@ -485,10 +531,20 @@ initfield:
     lda #>LOADSTART
     sta ZP_PTR_1+1
 
-    ; first load number of levels, pointed to by ZP_PTR_1,0
+    ; load number of levels, pointed to by ZP_PTR_1,0
     ldy #0
     lda (ZP_PTR_1),y
     sta no_levels
+
+    rts
+
+initfield:
+    ; load field pointer to first address at LOADSTART
+    ; load 1st pointer to temp pointer ZP_PTR_1
+    lda #<LOADSTART
+    sta ZP_PTR_1
+    lda #>LOADSTART
+    sta ZP_PTR_1+1
 
     ; skip to the first header, two bytes next
     clc
@@ -874,6 +930,33 @@ printfield2:
 
     jmp @nextrow
 @nextsection:
+    rts
+
+printdecimal2:
+    ; on entry A = value to print to standard out
+    ldx #$ff
+    sec
+@prdec100:
+    inx
+    sbc #100
+    bcs @prdec100
+    adc #100
+    jsr @prdecdigit
+    ldx #$ff
+    sec
+@prdec10:
+    inx
+    sbc #10
+    bcs @prdec10
+    adc #10
+    jsr @prdecdigit
+    tax
+@prdecdigit:
+    pha
+    txa
+    ora #'0'
+    jsr CHROUT
+    pla
     rts
 
 tiledata:
