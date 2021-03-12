@@ -5,7 +5,7 @@
 #include <string.h>
 #include <math.h>
 
-#define LOADADDRESS 0xa000  // RAM Bank 0
+#define LOADADDRESS 0x2000
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
@@ -147,7 +147,8 @@ int main(int argc, char *argv[])
         //                ## start payload 0
         // etc
         if(n == 0) levelpayload[n] = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * numlevels); 
-        else levelpayload[n] = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * numlevels) + (n * levelwidth[n-1] * levelheight[n-1]);
+//        else levelpayload[n] = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * numlevels) + (n * levelwidth[n-1] * levelheight[n-1]);
+        else levelpayload[n] = levelpayload[n-1] + (levelwidth[n-1] * levelheight[n-1]);
         leveloffset[n] = levelpayload[n] + leveloffset[n] - 1; // convert to address
         fprintf(outptr,"%c%c",(char)levelpayload[n],(char)(levelpayload[n]>>8));
         fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
