@@ -16,36 +16,40 @@ char linebuffer[BUFFERSIZE];
 
 int getplayerpos(char *string);
 int get_goalsfromline(char *string);
+int get_cratesfromline(char *string);
 
 int main(int argc, char *argv[])
 {
-    unsigned zerobyte = 0;
     unsigned int numlevels = 0, level = 0;
+    unsigned int fieldptr = 0;  // will point to the start of each field in memory
+    unsigned int previouspayloadsize = 0;
     unsigned int outputlength = 0;
     unsigned int playerpos = 0;
     unsigned int * levelheight;
     unsigned int * levelwidth;
     unsigned int * levelgoals;
-    unsigned int * levelpayload;
     unsigned int * leveloffset;
+    unsigned int * levelcrates;
+    bool * validlevel;          // record if each level is valid or not
+    unsigned int errorlevels;   // record number of error levels, due to too high or too wide
     bool playerfound = false;
     FILE *fptr,*outptr;
     
     if(argc <= 2)
     {
-        printf("How to use\n");
+        printf("Usage:\n\nsokobanprep inputfile outputfile\n");
         exit(1);
     }
     fptr = fopen(argv[1],"r");
     if(fptr == NULL)
     {
-        printf("Error opening file\n");   
+        printf("Error opening inputfile\n");   
         exit(1);             
     }
     outptr = fopen(argv[2],"wb");
     if(outptr == NULL)
     {
-        printf("Error opening output file\n");
+        printf("Error opening outputfile\n");
         fclose(fptr);
         exit(1);
     }
@@ -56,12 +60,6 @@ int main(int argc, char *argv[])
         if(strncmp(linebuffer,"Level",5) == 0) numlevels++;
     }
     rewind(fptr);
-    printf("%d Levels in file\n",numlevels);
-
-    // OUTPUT LOAD ADDRESS for x16 LOAD function
-    fprintf(outptr,"%c%c",(char)LOADADDRESS, LOADADDRESS>>8);
-    // OUTPUT #LEVELS as 16-bit integer
-    fprintf(outptr,"%c%c",(char)(numlevels), (char)(numlevels>>8));
 
     
     // determine max width / height per level
@@ -69,8 +67,9 @@ int main(int argc, char *argv[])
     levelheight = malloc(numlevels * sizeof(unsigned int));
     levelwidth = malloc(numlevels * sizeof(unsigned int));
     levelgoals = malloc(numlevels * sizeof(unsigned int));
-    levelpayload = malloc(numlevels * sizeof(unsigned int));
+    levelcrates = malloc(numlevels * sizeof(unsigned int));
     leveloffset = malloc(numlevels * sizeof(unsigned int));
+    validlevel = malloc(numlevels * sizeof(bool));
 
     while(fgets(linebuffer, sizeof(linebuffer), fptr) != NULL)
     {
@@ -81,23 +80,26 @@ int main(int argc, char *argv[])
             levelwidth[level-1] = 0;
             levelgoals[level-1] = 0;
             leveloffset[level-1] = 0;
+            levelcrates[level-1] = 0;
         }
         else
         {
-            outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
-            // empty line, or payload?
-            if(outputlength)
+            outputlength = strlen(linebuffer) - 1;  // remove EOL character at the end of the string
+            if(outputlength) // payload or empty line?
             {
                 // store maximum width at this level
                 if(levelwidth[level-1] < outputlength) levelwidth[level-1] = outputlength;
+
                 levelheight[level-1]++; // add another line to this level
                 levelgoals[level-1] += get_goalsfromline(linebuffer);
+                levelcrates[level-1] += get_cratesfromline(linebuffer);
             }
         }
     }
     rewind(fptr);
 
-    // now determine the player's position as an address at each level and store it in the array
+    // now determine the player's position as an offset at each level and store it in the array
+    // we will calculate the actual load address later, after we know which levels are valid
     level = 0;
     playerfound = false;
     while(fgets(linebuffer, sizeof(linebuffer), fptr) != NULL)
@@ -129,74 +131,119 @@ int main(int argc, char *argv[])
     }
     rewind(fptr);
 
-
+    // check the validity of each level and record for later use in calculating headers and level data
+    errorlevels = 0;
     for(int n = 0; n < numlevels; n++)
     {
-        // calculate payload for level n
-        // as the number of bytes AFTER the initial pointer to the number of levels in the file
-        // FILE LAYOUT
-        //                ## 2 byte load address
-        //  x16 pointer ->## 2 byte number of levels in the file
-        //
-        //                ## 2 byte start pointer to payload of level 0
-        //                ## 2 byte width of level 0 (in characters)
-        //                ## 2 byte height of level 0 (in lines)
-        //                ## 2 byte number of goals in this level
-        //                ## 2 byte ptr to player character in level 0
-        //                repeat of these 4 16-bit values for each additional level
-        //                ## start payload 0
-        // etc
-        if(n == 0) levelpayload[n] = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * numlevels); 
-//        else levelpayload[n] = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * numlevels) + (n * levelwidth[n-1] * levelheight[n-1]);
-        else levelpayload[n] = levelpayload[n-1] + (levelwidth[n-1] * levelheight[n-1]);
-        leveloffset[n] = levelpayload[n] + leveloffset[n] - 1; // convert to address
-        fprintf(outptr,"%c%c",(char)levelpayload[n],(char)(levelpayload[n]>>8));
-        fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
-        fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));
-        fprintf(outptr,"%c%c",(char)levelgoals[n],(char)(levelgoals[n]>>8));
-        fprintf(outptr,"%c%c",(char)leveloffset[n],(char)(leveloffset[n]>>8));
-    }
-    // header generation complete
-
-    // now transform the input to the output file and pad memory space
-    level = 0;
-    while(fgets(linebuffer, sizeof(linebuffer), fptr) != NULL)
-    {
-        if(strncmp(linebuffer,"Level",5) == 0)
+        validlevel[n] = true; // set as default, unless either width or height is out of spec
+        if(levelwidth[n] > MAXWIDTH)
         {
-            level++; // first level is 0, but marked at '1'
+            printf("ERROR: Level %d is too wide\n",n+1);
+            validlevel[n] = false;
         }
-        else
+        if(levelheight[n] > MAXHEIGHT)
         {
-            outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
-            // empty line, or payload?
-            //printf("%d\n",outputlength);
-            if(outputlength)
+            printf("ERROR: Level %d is too high\n",n+1);
+            validlevel[n] = false;
+        }
+        if(levelgoals[n] > levelcrates[n])
+        {
+            printf("ERROR: Level %d cannot be completed - not enough crates for the number of goals\n",n+1);
+            validlevel[n] = false;
+        }
+        if(validlevel[n] == false) errorlevels++; // record for later use in calculating resulting levels
+    }
+
+    // output results to the user
+    if((numlevels - errorlevels) > 0)
+    {
+        printf("%d levels in input file\n",numlevels);
+        printf("Writing %d valid levels to output file\n",numlevels - errorlevels);
+        
+        // Produce file header information
+        // OUTPUT LOAD ADDRESS for x16 LOAD function
+        fprintf(outptr,"%c%c",(char)LOADADDRESS, LOADADDRESS>>8);
+        // OUTPUT #LEVELS as 16-bit integer
+        fprintf(outptr,"%c%c",(char)(numlevels-errorlevels), (char)((numlevels-errorlevels)>>8));
+
+        // Produce level header information
+        fieldptr = 0;
+        for(int n = 0; n < numlevels; n++)
+        {
+            // calculate payload for level n
+            // as the number of bytes AFTER the initial pointer to the number of levels in the file
+            // FILE LAYOUT
+            //                ## 2 byte load address
+            //  x16 pointer ->## 2 byte number of levels in the file
+            //
+            //                ## 2 byte start pointer to payload of level 0
+            //                ## 2 byte width of level 0 (in characters)
+            //                ## 2 byte height of level 0 (in lines)
+            //                ## 2 byte number of goals in this level
+            //                ## 2 byte ptr to player character in level 0
+            //                repeat of these 16-bit values for each additional level
+            //                ## start payload 0
+            // etc
+
+            // first determine if this is a valid level to output in the header
+            if(validlevel[n] == true)
             {
-                //fprintf(outptr,"%s",linebuffer);
-                //fwrite(linebuffer,1,outputlength, outptr);
-                // now need to padd to max length with zeroes
-                for(int n = 0; n < levelwidth[level-1]; n++)
+                if(fieldptr == 0) // is this the first valid level?
                 {
-                    if(n < outputlength) fprintf(outptr,"%c",linebuffer[n]);
-                    else fprintf(outptr,"%c",0);
+                    fieldptr = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * (numlevels - errorlevels));
+                }
+                else
+                {
+                    fieldptr += previouspayloadsize;
+                }
+
+                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
+                fprintf(outptr,"%c%c",(char)fieldptr,(char)(fieldptr>>8));
+                fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
+                fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));
+                fprintf(outptr,"%c%c",(char)levelgoals[n],(char)(levelgoals[n]>>8));
+                fprintf(outptr,"%c%c",(char)leveloffset[n],(char)(leveloffset[n]>>8));
+
+                previouspayloadsize = levelwidth[n] * levelheight[n];
+
+            }
+        }
+        // header generation complete
+
+        // now transform the input to the output file and pad memory space
+        level = 0;
+        while(fgets(linebuffer, sizeof(linebuffer), fptr) != NULL)
+        {
+            if(strncmp(linebuffer,"Level",5) == 0)
+            {
+                level++; // first level is 0, but marked at '1'
+            }
+            else
+            {
+                if((level > 0) && (validlevel[level-1])) // only output valid level(s) - ignore the rest
+                {
+                    outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
+                    if(outputlength) // payload, or empty line
+                    {
+                        // now need to padd to max length with zeroes
+                        for(int n = 0; n < levelwidth[level-1]; n++)
+                        {
+                            if(n < outputlength) fprintf(outptr,"%c",linebuffer[n]);
+                            else fprintf(outptr,"%c",0);
+                        }
+                    }
                 }
             }
         }
     }
-
-    // output any too big levels here
-    for(int n = 0; n < numlevels; n++)
-    {
-        if(levelheight[n] > MAXHEIGHT) printf("ERROR: Level %d too high\n",n+1);
-        if(levelwidth[n] > MAXWIDTH) printf("ERROR: Level %d too wide\n", n+1);
-    }
+    else printf("No valid levels in input file\n");
 
     free(levelheight);
     free(levelwidth);
     free(levelgoals);
-    free(levelpayload);
     free(leveloffset);
+    free(validlevel);
+    free(levelcrates);
     fclose(fptr);
     fclose(outptr);
     exit(EXIT_SUCCESS);
@@ -227,6 +274,17 @@ int get_goalsfromline(char *string)
         string++;
     }
     return goalnum;
+}
+
+int get_cratesfromline(char *string)
+{
+    unsigned int cratenum = 0;
+    while(*string)
+    {
+        if(*string == '$' || *string == '*') cratenum++;
+        string++;
+    }
+    return cratenum;
 }
 
     /*
