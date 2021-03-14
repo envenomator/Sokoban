@@ -250,16 +250,17 @@ Current file: sokoban.asm
 000000r 1               ZP_PTR_FIELD = $28
 000000r 1               temp = $30  ; used for temp 8/16 bit storage $30/$31
 000000r 1               
-000000r 1               LOADSTART = $2000;
+000000r 1               LOADSTART = $2000
 000000r 1               NEWLINE = $0D
 000000r 1               UPPERCASE = $8E
 000000r 1               CLEARSCREEN = 147
 000000r 1               LEVELHEADER = 10
 000000r 1               
 000000r 1               ; screen 16x16bit tile width/height
-000000r 1               SCREENWIDTH = 20
-000000r 1               SCREENHEIGHT = 15
-000000r 1               
+000000r 1               ;SCREENWIDTH = 20
+000000r 1               ;SCREENHEIGHT = 15
+000000r 1               SCREENWIDTH = 40
+000000r 1               SCREENHEIGHT = 30
 000000r 1               .org $080D
 00080D  1               .segment "STARTUP"
 00080D  1               .segment "INIT"
@@ -312,8 +313,8 @@ Current file: sokoban.asm
 000874  1               ; ZP_PTR_2 - temporary pointer
 000874  1               ; ZP_PTR_3 - position of player
 000874  1               
-000874  1               loadfield:
-000874  1                   ; loads all fields from the file 'LEVELS.BIN'
+000874  1               loadlevels:
+000874  1                   ; loads all levels from the file 'LEVELS.BIN'
 000874  1  A9 0A            lda #filename_end - filename
 000876  1  A2 54            ldx #<filename
 000878  1  A0 08            ldy #>filename
@@ -332,7 +333,7 @@ Current file: sokoban.asm
 00088C  1  A9 8E            lda #UPPERCASE
 00088E  1  20 D2 FF         jsr CHROUT
 000891  1               
-000891  1  20 74 08         jsr loadfield
+000891  1  20 74 08         jsr loadlevels
 000894  1  90 0C            bcc @next
 000896  1                   ; error
 000896  1  A9 31            lda #<errormessage
@@ -348,7 +349,7 @@ Current file: sokoban.asm
 0008AB  1               
 0008AB  1  20 90 0A         jsr selectlevel
 0008AE  1  20 14 0B         jsr initfield       ; load correct startup values for selected field
-0008B1  1  20 9E 0C         jsr printfield2
+0008B1  1  20 96 0C         jsr printfield2
 0008B4  1               ;    jsr printfield
 0008B4  1               
 0008B4  1               keyloop:
@@ -527,7 +528,7 @@ Current file: sokoban.asm
 00098F  1               
 00098F  1  20 CC 0B         jsr cls
 000992  1               ;    jsr printfield
-000992  1  20 9E 0C         jsr printfield2
+000992  1  20 96 0C         jsr printfield2
 000995  1               
 000995  1  60               rts
 000996  1               @next:
@@ -550,7 +551,7 @@ Current file: sokoban.asm
 0009B3  1  20 0A 0A         jsr moveplayeronfield
 0009B6  1  20 C0 09         jsr moveplayerposition
 0009B9  1               
-0009B9  1  20 9E 0C         jsr printfield2
+0009B9  1  20 96 0C         jsr printfield2
 0009BC  1  20 CC 0B         jsr cls
 0009BF  1               ;    jsr printfield
 0009BF  1               @done:
@@ -935,37 +936,37 @@ Current file: sokoban.asm
 000BDF  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
 000BE2  1               
 000BE2  1  A2 00            ldx #0
-000BE4  1  BD C3 0D     :   lda tiledata,x                      ; index 0 / black tile
+000BE4  1  BD BA 0D     :   lda tiledata,x                      ; index 0 / black tile
 000BE7  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000BEA  1  E8               inx
 000BEB  1  D0 F7            bne :-
 000BED  1                   ; load Brick data
 000BED  1  A2 00            ldx #0
-000BEF  1  BD C3 0E     :   lda Brick,x                         ; index 1 / brick
+000BEF  1  BD BA 0E     :   lda Brick,x                         ; index 1 / brick
 000BF2  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000BF5  1  E8               inx
 000BF6  1  D0 F7            bne :-
 000BF8  1                   ; load player data
 000BF8  1  A2 00            ldx #0
-000BFA  1  BD C3 0F     :   lda player,x                        ; index 2 / player
+000BFA  1  BD BA 0F     :   lda player,x                        ; index 2 / player
 000BFD  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000C00  1  E8               inx
 000C01  1  D0 F7            bne :-
 000C03  1                   ; load crate data
 000C03  1  A2 00            ldx #0
-000C05  1  BD C3 10     :   lda crate,x                         ; index 3 / crate (normal)
+000C05  1  BD BA 10     :   lda crate,x                         ; index 3 / crate (normal)
 000C08  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000C0B  1  E8               inx
 000C0C  1  D0 F7            bne :-
 000C0E  1                   ; load goal data
 000C0E  1  A2 00            ldx #0
-000C10  1  BD C3 11     :   lda goal,x                         ; index 4 / goal (normal)
+000C10  1  BD BA 11     :   lda goal,x                         ; index 4 / goal (normal)
 000C13  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000C16  1  E8               inx
 000C17  1  D0 F7            bne :-
 000C19  1                   ; load crateongoal data
 000C19  1  A2 00            ldx #0
-000C1B  1  BD C3 12     :   lda crateongoal,x                   ; index 5 / crate on goal
+000C1B  1  BD BA 12     :   lda crateongoal,x                   ; index 5 / crate on goal
 000C1E  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000C21  1  E8               inx
 000C22  1  D0 F7            bne :-
@@ -974,7 +975,7 @@ Current file: sokoban.asm
 000C25  1               
 000C25  1               layerconfig:
 000C25  1               ; Configure Layer 0
-000C25  1  A9 03            lda #%00000011                      ; 32 x 32 tiles, 8 bits per pixel
+000C25  1  A9 53            lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
 000C27  1  8D 2D 9F         sta $9F2D
 000C2A  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
 000C2C  1  8D 2E 9F         sta $9F2E                           ; Store to Map Base Pointer
@@ -995,9 +996,9 @@ Current file: sokoban.asm
 000C48  1  8D 23 9F         sta VERA_DATA0
 000C4B  1  8D 23 9F         sta VERA_DATA0
 000C4E  1               
-000C4E  1  A0 20            ldy #32
+000C4E  1  A0 40            ldy #64
 000C50  1  A9 00            lda #0
-000C52  1  A2 20        :   ldx #32
+000C52  1  A2 40        :   ldx #64
 000C54  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
 000C57  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
 000C5A  1  CA               dex
@@ -1035,350 +1036,353 @@ Current file: sokoban.asm
 000C93  1  D0 F3            bne :-
 000C95  1               
 000C95  1               ; Scale Display x2 for resolution of 320 x 240 pixels
-000C95  1  A9 40            lda #$40
-000C97  1  8D 2A 9F         sta $9F2A
-000C9A  1  8D 2B 9F         sta $9F2B
-000C9D  1               
-000C9D  1  60               rts
+000C95  1               ;    lda #$40
+000C95  1               ;    sta $9F2A
+000C95  1               ;    sta $9F2B
+000C95  1               
+000C95  1  60               rts
+000C96  1               
+000C96  1               printfield2:
+000C96  1               ; prep variables for vera med/high bytes
+000C96  1               ;    topleft address for first tile is 0x04000
+000C96  1  A9 40            lda #$40
+000C98  1  8D 73 08         sta vera_byte_mid
+000C9B  1  9C 72 08         stz vera_byte_low
 000C9E  1               
-000C9E  1               printfield2:
-000C9E  1               ; prep variables for vera med/high bytes
-000C9E  1               ;    topleft address for first tile is 0x04000
-000C9E  1  A9 40            lda #$40
-000CA0  1  8D 73 08         sta vera_byte_mid
-000CA3  1  9C 72 08         stz vera_byte_low
-000CA6  1               
-000CA6  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
-000CA6  1  A9 14            lda #SCREENWIDTH
-000CA8  1  38               sec
-000CA9  1  ED 70 08         sbc fieldwidth
-000CAC  1  4A               lsr ; /2
-000CAD  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
-000CAE  1  8D 72 08         sta vera_byte_low
-000CB1  1               
-000CB1  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
-000CB1  1  A9 0F            lda #SCREENHEIGHT
-000CB3  1  38               sec
-000CB4  1  ED 71 08         sbc fieldheight
-000CB7  1  4A               lsr ; /2
-000CB8  1  AA               tax ; transfer to counter
-000CB9  1               @loop:
-000CB9  1  E0 00            cpx #$0
-000CBB  1  F0 16            beq @done ; exit loop when x == 0
-000CBD  1  AD 72 08         lda vera_byte_low
-000CC0  1  18               clc
-000CC1  1  69 40            adc #$40    ; add row ADDRESS height for exactly one row down
-000CC3  1  8D 72 08         sta vera_byte_low
-000CC6  1  90 08            bcc @decrement  ; no need to change the high byte
-000CC8  1  AD 73 08         lda vera_byte_mid
-000CCB  1  69 00            adc #$0     ; add carry (so +1)
-000CCD  1  8D 73 08         sta vera_byte_mid
-000CD0  1               @decrement: ; next row
-000CD0  1  CA               dex
-000CD1  1  80 E6            bra @loop
-000CD3  1               @done:
+000C9E  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
+000C9E  1  A9 28            lda #SCREENWIDTH
+000CA0  1  38               sec
+000CA1  1  ED 70 08         sbc fieldwidth
+000CA4  1  4A               lsr ; /2
+000CA5  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
+000CA6  1  8D 72 08         sta vera_byte_low
+000CA9  1               
+000CA9  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
+000CA9  1  A9 1E            lda #SCREENHEIGHT
+000CAB  1  38               sec
+000CAC  1  ED 71 08         sbc fieldheight
+000CAF  1  4A               lsr ; /2
+000CB0  1  AA               tax ; transfer number of rows down to counter
+000CB1  1               @loop:
+000CB1  1  E0 00            cpx #$0 ; any rows down (left)?
+000CB3  1  F0 16            beq @done ; exit loop when x == 0
+000CB5  1                   ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
+000CB5  1  AD 72 08         lda vera_byte_low
+000CB8  1  18               clc
+000CB9  1  69 80            adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
+000CBB  1  8D 72 08         sta vera_byte_low
+000CBE  1  90 08            bcc @decrement  ; no need to change the high byte
+000CC0  1  AD 73 08         lda vera_byte_mid
+000CC3  1  69 00            adc #$0     ; add carry (so +1)
+000CC5  1  8D 73 08         sta vera_byte_mid
+000CC8  1               @decrement: ; next row
+000CC8  1  CA               dex
+000CC9  1  80 E6            bra @loop
+000CCB  1               @done:
+000CCB  1               
+000CCB  1               ; prepare the pointers to the back-end field data, so we know what to display
+000CCB  1  A5 28            lda ZP_PTR_FIELD
+000CCD  1  85 00            sta ZP_PTR_1
+000CCF  1  A5 29            lda ZP_PTR_FIELD+1
+000CD1  1  85 01            sta ZP_PTR_1+1
 000CD3  1               
-000CD3  1               ; First, prepare the pointers to the back-end field data
-000CD3  1  A5 28            lda ZP_PTR_FIELD
-000CD5  1  85 00            sta ZP_PTR_1
-000CD7  1  A5 29            lda ZP_PTR_FIELD+1
-000CD9  1  85 01            sta ZP_PTR_1+1
-000CDB  1               
-000CDB  1  A2 00            ldx #0 ; row counter
-000CDD  1               @nextrow:
-000CDD  1  A0 00            ldy #0 ; column counter
-000CDF  1                   ; prepare vera pointers for this row
-000CDF  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000CE2  1  A9 10            lda #$10
-000CE4  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000CE7  1  AD 73 08         lda vera_byte_mid
-000CEA  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-000CED  1  AD 72 08         lda vera_byte_low
-000CF0  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-000CF3  1               
-000CF3  1               @row:
-000CF3  1  B1 00            lda (ZP_PTR_1),y
-000CF5  1  C9 40            cmp #'@'
-000CF7  1  F0 2A            beq @player
-000CF9  1  C9 2B            cmp #'+'
-000CFB  1  F0 26            beq @player
-000CFD  1  C9 24            cmp #'$'
-000CFF  1  F0 32            beq @crate
-000D01  1  C9 2E            cmp #'.'
-000D03  1  F0 4E            beq @goal
-000D05  1  C9 2A            cmp #'*'
-000D07  1  F0 3A            beq @crateongoal
-000D09  1  C9 20            cmp #' '
-000D0B  1  F0 06            beq @ignore
-000D0D  1  C9 00            cmp #0
-000D0F  1  F0 02            beq @ignore
-000D11  1  80 50            bra @wall
-000D13  1               @ignore:
-000D13  1                   ; ignore
-000D13  1  A9 00            lda #$0 ; black tile
-000D15  1  8D 23 9F         sta VERA_DATA0
-000D18  1  9C 23 9F         stz VERA_DATA0
-000D1B  1  C8               iny
-000D1C  1  CC 70 08         cpy fieldwidth
-000D1F  1  D0 D2            bne @row
-000D21  1  80 4E            bra @endline
-000D23  1               @player:
-000D23  1  A9 02            lda #$2
-000D25  1  8D 23 9F         sta VERA_DATA0
-000D28  1  9C 23 9F         stz VERA_DATA0
-000D2B  1  C8               iny
-000D2C  1  CC 70 08         cpy fieldwidth
-000D2F  1  D0 C2            bne @row
-000D31  1  80 3E            bra @endline
-000D33  1               @crate:
-000D33  1  A9 03            lda #$3
-000D35  1  8D 23 9F         sta VERA_DATA0
-000D38  1  9C 23 9F         stz VERA_DATA0
-000D3B  1  C8               iny
-000D3C  1  CC 70 08         cpy fieldwidth
-000D3F  1  D0 B2            bne @row
-000D41  1  80 2E            bra @endline
-000D43  1               @crateongoal:
-000D43  1  A9 05            lda #$5
-000D45  1  8D 23 9F         sta VERA_DATA0
-000D48  1  9C 23 9F         stz VERA_DATA0
-000D4B  1  C8               iny
-000D4C  1  CC 70 08         cpy fieldwidth
-000D4F  1  D0 A2            bne @row
-000D51  1  80 1E            bra @endline
-000D53  1               @goal:
-000D53  1  A9 04            lda #$4
-000D55  1  8D 23 9F         sta VERA_DATA0
-000D58  1  9C 23 9F         stz VERA_DATA0
-000D5B  1  C8               iny
-000D5C  1  CC 70 08         cpy fieldwidth
-000D5F  1  D0 92            bne @row
-000D61  1  80 0E            bra @endline
+000CD3  1               ; start displaying the selected field
+000CD3  1               ; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
+000CD3  1  A2 00            ldx #0 ; row counter
+000CD5  1               @nextrow:
+000CD5  1  A0 00            ldy #0 ; column counter
+000CD7  1                   ; prepare vera pointers for this row
+000CD7  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+000CDA  1  A9 10            lda #$10
+000CDC  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+000CDF  1  AD 73 08         lda vera_byte_mid
+000CE2  1  8D 21 9F         sta VERA_MID
+000CE5  1  AD 72 08         lda vera_byte_low
+000CE8  1  8D 20 9F         sta VERA_LOW
+000CEB  1               
+000CEB  1               @row:
+000CEB  1                   ; sweep the field, row by row, indexed by column y
+000CEB  1  B1 00            lda (ZP_PTR_1),y
+000CED  1  C9 40            cmp #'@'
+000CEF  1  F0 2A            beq @player
+000CF1  1  C9 2B            cmp #'+'
+000CF3  1  F0 26            beq @player
+000CF5  1  C9 24            cmp #'$'
+000CF7  1  F0 32            beq @crate
+000CF9  1  C9 2E            cmp #'.'
+000CFB  1  F0 4E            beq @goal
+000CFD  1  C9 2A            cmp #'*'
+000CFF  1  F0 3A            beq @crateongoal
+000D01  1  C9 20            cmp #' '
+000D03  1  F0 06            beq @ignore
+000D05  1  C9 00            cmp #0
+000D07  1  F0 02            beq @ignore
+000D09  1  80 50            bra @wall
+000D0B  1               @ignore:
+000D0B  1                   ; ignore
+000D0B  1  A9 00            lda #$0 ; black tile
+000D0D  1  8D 23 9F         sta VERA_DATA0
+000D10  1  9C 23 9F         stz VERA_DATA0
+000D13  1  C8               iny
+000D14  1  CC 70 08         cpy fieldwidth
+000D17  1  D0 D2            bne @row
+000D19  1  80 4E            bra @endline
+000D1B  1               @player:
+000D1B  1  A9 02            lda #$2
+000D1D  1  8D 23 9F         sta VERA_DATA0
+000D20  1  9C 23 9F         stz VERA_DATA0
+000D23  1  C8               iny
+000D24  1  CC 70 08         cpy fieldwidth
+000D27  1  D0 C2            bne @row
+000D29  1  80 3E            bra @endline
+000D2B  1               @crate:
+000D2B  1  A9 03            lda #$3
+000D2D  1  8D 23 9F         sta VERA_DATA0
+000D30  1  9C 23 9F         stz VERA_DATA0
+000D33  1  C8               iny
+000D34  1  CC 70 08         cpy fieldwidth
+000D37  1  D0 B2            bne @row
+000D39  1  80 2E            bra @endline
+000D3B  1               @crateongoal:
+000D3B  1  A9 05            lda #$5
+000D3D  1  8D 23 9F         sta VERA_DATA0
+000D40  1  9C 23 9F         stz VERA_DATA0
+000D43  1  C8               iny
+000D44  1  CC 70 08         cpy fieldwidth
+000D47  1  D0 A2            bne @row
+000D49  1  80 1E            bra @endline
+000D4B  1               @goal:
+000D4B  1  A9 04            lda #$4
+000D4D  1  8D 23 9F         sta VERA_DATA0
+000D50  1  9C 23 9F         stz VERA_DATA0
+000D53  1  C8               iny
+000D54  1  CC 70 08         cpy fieldwidth
+000D57  1  D0 92            bne @row
+000D59  1  80 0E            bra @endline
+000D5B  1               
+000D5B  1               @wall:
+000D5B  1  A9 01            lda #$1 ; load tile 1 ; brick
+000D5D  1  8D 23 9F         sta VERA_DATA0
+000D60  1  9C 23 9F         stz VERA_DATA0
 000D63  1               
-000D63  1               @wall:
-000D63  1  A9 01            lda #$1 ; load tile 1 ; brick
-000D65  1  8D 23 9F         sta VERA_DATA0
-000D68  1  9C 23 9F         stz VERA_DATA0
-000D6B  1               
-000D6B  1  C8               iny
-000D6C  1  CC 70 08         cpy fieldwidth
-000D6F  1  D0 82            bne @row
-000D71  1               @endline:
-000D71  1                   ; advance pointer to next row
-000D71  1  A5 00            lda ZP_PTR_1
-000D73  1  18               clc
-000D74  1  6D 70 08         adc fieldwidth
-000D77  1  85 00            sta ZP_PTR_1
-000D79  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
-000D7B  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-000D7D  1  18               clc
-000D7E  1  69 01            adc #1
-000D80  1  85 01            sta ZP_PTR_1+1
-000D82  1               @checklastrow:
-000D82  1                   ; last row?
-000D82  1                   ; increment vera pointer to next row
-000D82  1  AD 72 08         lda vera_byte_low
-000D85  1  18               clc
-000D86  1  69 40            adc #$40    ; add 40 - address to next row
-000D88  1  8D 72 08         sta vera_byte_low
-000D8B  1  90 08            bcc @next3  ; no need to change the high byte
-000D8D  1  AD 73 08         lda vera_byte_mid
-000D90  1  69 00            adc #$0     ; add carry (so +1)
-000D92  1  8D 73 08         sta vera_byte_mid
-000D95  1               @next3:
-000D95  1  E8               inx
-000D96  1  EC 71 08         cpx fieldheight
-000D99  1  F0 03            beq @nextsection
-000D9B  1               
-000D9B  1  4C DD 0C         jmp @nextrow
-000D9E  1               @nextsection:
-000D9E  1  60               rts
-000D9F  1               
-000D9F  1               printdecimal2:
-000D9F  1                   ; on entry A = value to print to standard out
-000D9F  1  A2 FF            ldx #$ff
-000DA1  1  38               sec
-000DA2  1               @prdec100:
-000DA2  1  E8               inx
-000DA3  1  E9 64            sbc #100
-000DA5  1  B0 FB            bcs @prdec100
-000DA7  1  69 64            adc #100
-000DA9  1  20 BA 0D         jsr @prdecdigit
-000DAC  1  A2 FF            ldx #$ff
-000DAE  1  38               sec
-000DAF  1               @prdec10:
-000DAF  1  E8               inx
-000DB0  1  E9 0A            sbc #10
-000DB2  1  B0 FB            bcs @prdec10
-000DB4  1  69 0A            adc #10
-000DB6  1  20 BA 0D         jsr @prdecdigit
-000DB9  1  AA               tax
-000DBA  1               @prdecdigit:
-000DBA  1  48               pha
-000DBB  1  8A               txa
-000DBC  1  09 30            ora #'0'
-000DBE  1  20 D2 FF         jsr CHROUT
-000DC1  1  68               pla
-000DC2  1  60               rts
-000DC3  1               
-000DC3  1               tiledata:
-000DC3  1               black:
-000DC3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000DC7  1  00 00 00 00  
-000DCB  1  00 00 00 00  
-000DD3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000DD7  1  00 00 00 00  
-000DDB  1  00 00 00 00  
-000DE3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000DE7  1  00 00 00 00  
-000DEB  1  00 00 00 00  
-000DF3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000DF7  1  00 00 00 00  
-000DFB  1  00 00 00 00  
-000E03  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E07  1  00 00 00 00  
-000E0B  1  00 00 00 00  
-000E13  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E17  1  00 00 00 00  
-000E1B  1  00 00 00 00  
-000E23  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E27  1  00 00 00 00  
-000E2B  1  00 00 00 00  
-000E33  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E37  1  00 00 00 00  
-000E3B  1  00 00 00 00  
-000E43  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E47  1  00 00 00 00  
-000E4B  1  00 00 00 00  
-000E53  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E57  1  00 00 00 00  
-000E5B  1  00 00 00 00  
-000E63  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E67  1  00 00 00 00  
-000E6B  1  00 00 00 00  
-000E73  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E77  1  00 00 00 00  
-000E7B  1  00 00 00 00  
-000E83  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E87  1  00 00 00 00  
-000E8B  1  00 00 00 00  
-000E93  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000E97  1  00 00 00 00  
-000E9B  1  00 00 00 00  
-000EA3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000EA7  1  00 00 00 00  
-000EAB  1  00 00 00 00  
-000EB3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-000EB7  1  00 00 00 00  
-000EBB  1  00 00 00 00  
-000EC3  1               Brick:
-000EC3  1  08 08 08 08      .byte 8,8,8,8,8,8,8,229,8,8,8,8,8,8,8,8
-000EC7  1  08 08 08 E5  
-000ECB  1  08 08 08 08  
-000ED3  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
-000ED7  1  2A 2A 29 E5  
-000EDB  1  08 2A 2A 2A  
-000EE3  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,44,42,42,42,42,42
-000EE7  1  2A 2A 29 E5  
-000EEB  1  08 2A 2C 2A  
-000EF3  1  2A 2A 2C 2C      .byte 42,42,44,44,42,42,41,229,8,42,42,42,42,42,42,42
-000EF7  1  2A 2A 29 E5  
-000EFB  1  08 2A 2A 2A  
-000F03  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
-000F07  1  2A 2A 29 E5  
-000F0B  1  08 2A 2A 2A  
-000F13  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,41,41,42
-000F17  1  2A 2A 29 E5  
-000F1B  1  08 2A 2A 2A  
-000F23  1  29 29 29 29      .byte 41,41,41,41,41,41,41,229,8,41,41,41,41,41,41,41
-000F27  1  29 29 29 E5  
-000F2B  1  08 29 29 29  
-000F33  1  E5 E5 E5 E5      .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
-000F37  1  E5 E5 E5 E5  
-000F3B  1  E5 E5 E5 E5  
-000F43  1  E5 08 08 08      .byte 229,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8
-000F47  1  08 08 08 08  
-000F4B  1  08 08 08 08  
-000F53  1  E5 08 08 2A      .byte 229,8,8,42,44,44,42,42,42,42,42,42,42,42,42,41
-000F57  1  2C 2C 2A 2A  
-000F5B  1  2A 2A 2A 2A  
-000F63  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
-000F67  1  2A 2A 2A 2A  
-000F6B  1  2A 2A 2A 2A  
-000F73  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,41,41,42,42,42,42,42,42,42,41
-000F77  1  2A 2A 29 29  
-000F7B  1  2A 2A 2A 2A  
-000F83  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,41,42,41
-000F87  1  2A 2A 2A 2A  
-000F8B  1  2A 2A 2A 2A  
-000F93  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
-000F97  1  2A 2A 2A 2A  
-000F9B  1  2A 2A 2A 2A  
-000FA3  1  E5 08 29 29      .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
-000FA7  1  29 29 29 29  
-000FAB  1  29 29 29 29  
-000FB3  1  E5 E5 E5 E5      .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
-000FB7  1  E5 E5 E5 E5  
-000FBB  1  E5 E5 E5 E5  
-000FC3  1               player:
-000FC3  1  00 00 00 00  .incbin "player.bin"
-000FC7  1  00 10 10 10  
-000FCB  1  10 0B 00 00  
-0010C3  1               crate:
-0010C3  1  57 57 57 57  .incbin "crate.bin"
-0010C7  1  57 57 57 57  
-0010CB  1  57 57 57 57  
-0011C3  1               goal:
-0011C3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0011C7  1  00 00 00 00  
-0011CB  1  00 00 00 00  
-0011D3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0011D7  1  00 00 00 00  
-0011DB  1  00 00 00 00  
-0011E3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0011E7  1  00 00 00 00  
-0011EB  1  00 00 00 00  
-0011F3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0011F7  1  00 00 00 00  
-0011FB  1  00 00 00 00  
-001203  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001207  1  00 00 00 00  
-00120B  1  00 00 00 00  
-001213  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001217  1  00 00 00 00  
-00121B  1  00 00 00 00  
-001223  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-001227  1  00 00 72 72  
-00122B  1  72 72 00 00  
-001233  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-001237  1  00 00 72 72  
-00123B  1  72 72 00 00  
-001243  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-001247  1  00 00 72 72  
-00124B  1  72 72 00 00  
-001253  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-001257  1  00 00 72 72  
-00125B  1  72 72 00 00  
-001263  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001267  1  00 00 00 00  
-00126B  1  00 00 00 00  
-001273  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001277  1  00 00 00 00  
-00127B  1  00 00 00 00  
-001283  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001287  1  00 00 00 00  
-00128B  1  00 00 00 00  
-001293  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-001297  1  00 00 00 00  
-00129B  1  00 00 00 00  
-0012A3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0012A7  1  00 00 00 00  
-0012AB  1  00 00 00 00  
-0012B3  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-0012B7  1  00 00 00 00  
-0012BB  1  00 00 00 00  
-0012C3  1               crateongoal:
-0012C3  1  65 65 65 65  .incbin "crateongoal.bin"
-0012C7  1  65 65 65 65  
-0012CB  1  65 65 65 65  
-0012C3  1               
+000D63  1  C8               iny
+000D64  1  CC 70 08         cpy fieldwidth
+000D67  1  D0 82            bne @row
+000D69  1               @endline:
+000D69  1                   ; advance pointer to next row in the field
+000D69  1  A5 00            lda ZP_PTR_1
+000D6B  1  18               clc
+000D6C  1  6D 70 08         adc fieldwidth
+000D6F  1  85 00            sta ZP_PTR_1
+000D71  1  90 06            bcc @checklastrow ; no carry, don't increment high byte on pointer
+000D73  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+000D75  1  69 00            adc #0
+000D77  1  85 01            sta ZP_PTR_1+1
+000D79  1               @checklastrow:
+000D79  1                   ; last row?
+000D79  1                   ; increment vera pointer to next row
+000D79  1  AD 72 08         lda vera_byte_low
+000D7C  1  18               clc
+000D7D  1  69 80            adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
+000D7F  1  8D 72 08         sta vera_byte_low
+000D82  1  90 08            bcc @next3  ; no need to change the high byte
+000D84  1  AD 73 08         lda vera_byte_mid
+000D87  1  69 00            adc #$0     ; add carry (so +1)
+000D89  1  8D 73 08         sta vera_byte_mid
+000D8C  1               @next3:
+000D8C  1  E8               inx
+000D8D  1  EC 71 08         cpx fieldheight
+000D90  1  F0 03            beq @nextsection
+000D92  1               
+000D92  1  4C D5 0C         jmp @nextrow
+000D95  1               @nextsection:
+000D95  1  60               rts
+000D96  1               
+000D96  1               printdecimal2:
+000D96  1                   ; on entry A = value to print to standard out
+000D96  1  A2 FF            ldx #$ff
+000D98  1  38               sec
+000D99  1               @prdec100:
+000D99  1  E8               inx
+000D9A  1  E9 64            sbc #100
+000D9C  1  B0 FB            bcs @prdec100
+000D9E  1  69 64            adc #100
+000DA0  1  20 B1 0D         jsr @prdecdigit
+000DA3  1  A2 FF            ldx #$ff
+000DA5  1  38               sec
+000DA6  1               @prdec10:
+000DA6  1  E8               inx
+000DA7  1  E9 0A            sbc #10
+000DA9  1  B0 FB            bcs @prdec10
+000DAB  1  69 0A            adc #10
+000DAD  1  20 B1 0D         jsr @prdecdigit
+000DB0  1  AA               tax
+000DB1  1               @prdecdigit:
+000DB1  1  48               pha
+000DB2  1  8A               txa
+000DB3  1  09 30            ora #'0'
+000DB5  1  20 D2 FF         jsr CHROUT
+000DB8  1  68               pla
+000DB9  1  60               rts
+000DBA  1               
+000DBA  1               tiledata:
+000DBA  1               black:
+000DBA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000DBE  1  00 00 00 00  
+000DC2  1  00 00 00 00  
+000DCA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000DCE  1  00 00 00 00  
+000DD2  1  00 00 00 00  
+000DDA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000DDE  1  00 00 00 00  
+000DE2  1  00 00 00 00  
+000DEA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000DEE  1  00 00 00 00  
+000DF2  1  00 00 00 00  
+000DFA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000DFE  1  00 00 00 00  
+000E02  1  00 00 00 00  
+000E0A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E0E  1  00 00 00 00  
+000E12  1  00 00 00 00  
+000E1A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E1E  1  00 00 00 00  
+000E22  1  00 00 00 00  
+000E2A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E2E  1  00 00 00 00  
+000E32  1  00 00 00 00  
+000E3A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E3E  1  00 00 00 00  
+000E42  1  00 00 00 00  
+000E4A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E4E  1  00 00 00 00  
+000E52  1  00 00 00 00  
+000E5A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E5E  1  00 00 00 00  
+000E62  1  00 00 00 00  
+000E6A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E6E  1  00 00 00 00  
+000E72  1  00 00 00 00  
+000E7A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E7E  1  00 00 00 00  
+000E82  1  00 00 00 00  
+000E8A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E8E  1  00 00 00 00  
+000E92  1  00 00 00 00  
+000E9A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000E9E  1  00 00 00 00  
+000EA2  1  00 00 00 00  
+000EAA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+000EAE  1  00 00 00 00  
+000EB2  1  00 00 00 00  
+000EBA  1               Brick:
+000EBA  1  08 08 08 08      .byte 8,8,8,8,8,8,8,229,8,8,8,8,8,8,8,8
+000EBE  1  08 08 08 E5  
+000EC2  1  08 08 08 08  
+000ECA  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
+000ECE  1  2A 2A 29 E5  
+000ED2  1  08 2A 2A 2A  
+000EDA  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,44,42,42,42,42,42
+000EDE  1  2A 2A 29 E5  
+000EE2  1  08 2A 2C 2A  
+000EEA  1  2A 2A 2C 2C      .byte 42,42,44,44,42,42,41,229,8,42,42,42,42,42,42,42
+000EEE  1  2A 2A 29 E5  
+000EF2  1  08 2A 2A 2A  
+000EFA  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
+000EFE  1  2A 2A 29 E5  
+000F02  1  08 2A 2A 2A  
+000F0A  1  2A 2A 2A 2A      .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,41,41,42
+000F0E  1  2A 2A 29 E5  
+000F12  1  08 2A 2A 2A  
+000F1A  1  29 29 29 29      .byte 41,41,41,41,41,41,41,229,8,41,41,41,41,41,41,41
+000F1E  1  29 29 29 E5  
+000F22  1  08 29 29 29  
+000F2A  1  E5 E5 E5 E5      .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
+000F2E  1  E5 E5 E5 E5  
+000F32  1  E5 E5 E5 E5  
+000F3A  1  E5 08 08 08      .byte 229,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8
+000F3E  1  08 08 08 08  
+000F42  1  08 08 08 08  
+000F4A  1  E5 08 08 2A      .byte 229,8,8,42,44,44,42,42,42,42,42,42,42,42,42,41
+000F4E  1  2C 2C 2A 2A  
+000F52  1  2A 2A 2A 2A  
+000F5A  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
+000F5E  1  2A 2A 2A 2A  
+000F62  1  2A 2A 2A 2A  
+000F6A  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,41,41,42,42,42,42,42,42,42,41
+000F6E  1  2A 2A 29 29  
+000F72  1  2A 2A 2A 2A  
+000F7A  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,41,42,41
+000F7E  1  2A 2A 2A 2A  
+000F82  1  2A 2A 2A 2A  
+000F8A  1  E5 08 2A 2A      .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
+000F8E  1  2A 2A 2A 2A  
+000F92  1  2A 2A 2A 2A  
+000F9A  1  E5 08 29 29      .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
+000F9E  1  29 29 29 29  
+000FA2  1  29 29 29 29  
+000FAA  1  E5 E5 E5 E5      .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
+000FAE  1  E5 E5 E5 E5  
+000FB2  1  E5 E5 E5 E5  
+000FBA  1               player:
+000FBA  1  00 00 00 00  .incbin "tiles/player.bin"
+000FBE  1  00 10 10 10  
+000FC2  1  10 0B 00 00  
+0010BA  1               crate:
+0010BA  1  57 57 57 57  .incbin "tiles/crate.bin"
+0010BE  1  57 57 57 57  
+0010C2  1  57 57 57 57  
+0011BA  1               goal:
+0011BA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0011BE  1  00 00 00 00  
+0011C2  1  00 00 00 00  
+0011CA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0011CE  1  00 00 00 00  
+0011D2  1  00 00 00 00  
+0011DA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0011DE  1  00 00 00 00  
+0011E2  1  00 00 00 00  
+0011EA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0011EE  1  00 00 00 00  
+0011F2  1  00 00 00 00  
+0011FA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0011FE  1  00 00 00 00  
+001202  1  00 00 00 00  
+00120A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00120E  1  00 00 00 00  
+001212  1  00 00 00 00  
+00121A  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+00121E  1  00 00 72 72  
+001222  1  72 72 00 00  
+00122A  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+00122E  1  00 00 72 72  
+001232  1  72 72 00 00  
+00123A  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+00123E  1  00 00 72 72  
+001242  1  72 72 00 00  
+00124A  1  00 00 00 00      .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
+00124E  1  00 00 72 72  
+001252  1  72 72 00 00  
+00125A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00125E  1  00 00 00 00  
+001262  1  00 00 00 00  
+00126A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00126E  1  00 00 00 00  
+001272  1  00 00 00 00  
+00127A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00127E  1  00 00 00 00  
+001282  1  00 00 00 00  
+00128A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00128E  1  00 00 00 00  
+001292  1  00 00 00 00  
+00129A  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+00129E  1  00 00 00 00  
+0012A2  1  00 00 00 00  
+0012AA  1  00 00 00 00      .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+0012AE  1  00 00 00 00  
+0012B2  1  00 00 00 00  
+0012BA  1               crateongoal:
+0012BA  1  65 65 65 65  .incbin "tiles/crateongoal.bin"
+0012BE  1  65 65 65 65  
+0012C2  1  65 65 65 65  
+0012BA  1               

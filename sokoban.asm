@@ -5,16 +5,17 @@
 ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 
-LOADSTART = $2000;
+LOADSTART = $2000  
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 10
 
 ; screen 16x16bit tile width/height
-SCREENWIDTH = 20
-SCREENHEIGHT = 15
-
+;SCREENWIDTH = 20
+;SCREENHEIGHT = 15
+SCREENWIDTH = 40
+SCREENHEIGHT = 30
 .org $080D
 .segment "STARTUP"
 .segment "INIT"
@@ -55,8 +56,8 @@ vera_byte_mid: .byte 0
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
 
-loadfield:
-    ; loads all fields from the file 'LEVELS.BIN'
+loadlevels:
+    ; loads all levels from the file 'LEVELS.BIN'
     lda #filename_end - filename
     ldx #<filename
     ldy #>filename
@@ -75,7 +76,7 @@ start:
     lda #UPPERCASE
     jsr CHROUT
 
-    jsr loadfield
+    jsr loadlevels
     bcc @next
     ; error
     lda #<errormessage
@@ -717,7 +718,7 @@ loadtiles:
 
 layerconfig:
 ; Configure Layer 0
-    lda #%00000011                      ; 32 x 32 tiles, 8 bits per pixel
+    lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
     sta $9F2D
     lda #$20                            ; $20 points to $4000 in VRAM
     sta $9F2E                           ; Store to Map Base Pointer
@@ -738,9 +739,9 @@ layerconfig:
     sta VERA_DATA0
     sta VERA_DATA0
 
-    ldy #32
+    ldy #64
     lda #0
-:   ldx #32
+:   ldx #64
 :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
     sta VERA_DATA0                      ; Write Attribute
     dex
@@ -778,9 +779,9 @@ layerconfig:
     bne :-
 
 ; Scale Display x2 for resolution of 320 x 240 pixels
-    lda #$40
-    sta $9F2A
-    sta $9F2B
+;    lda #$40
+;    sta $9F2A
+;    sta $9F2B
 
     rts
 
@@ -804,13 +805,14 @@ printfield2:
     sec
     sbc fieldheight
     lsr ; /2
-    tax ; transfer to counter
+    tax ; transfer number of rows down to counter
 @loop:
-    cpx #$0
+    cpx #$0 ; any rows down (left)?
     beq @done ; exit loop when x == 0
+    ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
     lda vera_byte_low
     clc
-    adc #$40    ; add row ADDRESS height for exactly one row down
+    adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
     sta vera_byte_low
     bcc @decrement  ; no need to change the high byte
     lda vera_byte_mid
@@ -821,12 +823,14 @@ printfield2:
     bra @loop
 @done:
 
-; First, prepare the pointers to the back-end field data
+; prepare the pointers to the back-end field data, so we know what to display
     lda ZP_PTR_FIELD
     sta ZP_PTR_1
     lda ZP_PTR_FIELD+1
     sta ZP_PTR_1+1
 
+; start displaying the selected field
+; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
     ldx #0 ; row counter
 @nextrow:
     ldy #0 ; column counter
@@ -835,11 +839,12 @@ printfield2:
     lda #$10
     sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
     lda vera_byte_mid
-    sta VERA_MID                        ; Set Middle Byte to $40
+    sta VERA_MID                        
     lda vera_byte_low
-    sta VERA_LOW                        ; Set Low Byte to $00
+    sta VERA_LOW                       
 
 @row:
+    ; sweep the field, row by row, indexed by column y
     lda (ZP_PTR_1),y
     cmp #'@'
     beq @player
@@ -907,22 +912,21 @@ printfield2:
     cpy fieldwidth
     bne @row
 @endline:
-    ; advance pointer to next row
+    ; advance pointer to next row in the field
     lda ZP_PTR_1
     clc
     adc fieldwidth
     sta ZP_PTR_1
     bcc @checklastrow ; no carry, don't increment high byte on pointer
     lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-    clc
-    adc #1
+    adc #0
     sta ZP_PTR_1+1
 @checklastrow:
     ; last row?
     ; increment vera pointer to next row
     lda vera_byte_low
     clc
-    adc #$40    ; add 40 - address to next row
+    adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
     sta vera_byte_low
     bcc @next3  ; no need to change the high byte
     lda vera_byte_mid
@@ -1000,9 +1004,9 @@ Brick:
     .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
     .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
 player:
-.incbin "player.bin"
+.incbin "tiles/player.bin"
 crate:
-.incbin "crate.bin"
+.incbin "tiles/crate.bin"
 goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -1021,4 +1025,4 @@ goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 crateongoal:
-.incbin "crateongoal.bin"
+.incbin "tiles/crateongoal.bin"

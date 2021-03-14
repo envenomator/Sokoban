@@ -4,12 +4,12 @@
 #include <string.h>
 #include <math.h>
 
-#define LOADADDRESS 0x2000
+#define LOADADDRESS 0x2000 
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
-#define MAXWIDTH 20
-#define MAXHEIGHT 15
+#define MAXWIDTH 40
+#define MAXHEIGHT 30
 
 char linebuffer[BUFFERSIZE];
 
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
         }
         if(validlevel[n] == false) errorlevels++; // record for later use in calculating resulting levels
     }
-    printf("Removed %d invalid levels\n",errorlevels);
+    if(errorlevels) printf("Removed %d invalid levels\n",errorlevels);
     printf("Written %d valid levels to \"%s\"\n",numlevels - errorlevels,argv[2]);
 
     if((numlevels - errorlevels) > 0)
