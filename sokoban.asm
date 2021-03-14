@@ -5,6 +5,7 @@ NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 10
+MAXUNDO = 10
 
 ; screen 16x16bit tile width/height
 SCREENWIDTH = 40
@@ -41,6 +42,7 @@ fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlev
 vera_byte_low:  .byte 0
 vera_byte_mid:  .byte 0
 undostack:      .byte 0,0,0,0,0,0,0,0,0,0
+undoindex:      .byte 0
 undocounter:    .byte 0
 
 ; usage of zeropage address space:
@@ -245,14 +247,8 @@ handleup:
     sbc #$0
     sta ZP_PTR_1+1
 
+    ldx #%00001000 ; up direction
     jsr handlemove
-
-    ; store in undo stack
-;    lda undocounter
-;    cmp #$MAXUNDO-1
-;    beq @done ; maximum undo reached
-
-;@done:
 
     rts
 
@@ -334,6 +330,8 @@ handledown:
     sta ZP_PTR_1+1
 
     jsr handlemove
+
+    
     rts
 
 handle_undo_down:
@@ -435,6 +433,8 @@ handlemove:
     ; 2 - points to the next block at the indicated direction
     ; 1 - points to the block after that block
 
+    phx ; push x to stack with stored direction
+
     ldy #0
     lda (ZP_PTR_2),y
     cmp #' ' ; empty block next to player?
@@ -447,11 +447,22 @@ handlemove:
     jsr moveplayeronfield
     jsr moveplayerposition
 
-    jsr cls
-;    jsr printfield
-    jsr printfield2
-
-    rts
+    ; record single move to undo stack
+    pla
+    ldy undoindex
+    sta (ZP_PTR_UNDO),y
+    lda undocounter
+    cmp #MAXUNDO
+    beq @maxcountreached
+    inc undocounter
+@maxcountreached:
+    cpy #MAXUNDO
+    beq @zeroindex
+    inc undoindex
+    bra @movecomplete
+@zeroindex:
+    stz undoindex
+    bra @movecomplete
 @next:
     ldy #0
     lda (ZP_PTR_2),y
@@ -472,10 +483,28 @@ handlemove:
     jsr moveplayeronfield
     jsr moveplayerposition
 
+    ; record combined move to undo stack
+    pla
+    ora #%0010000   ; set 'combined' bit 4
+    ldy undoindex
+    sta (ZP_PTR_UNDO),y
+    lda undocounter
+    cmp #MAXUNDO
+    beq @maxcountreached2
+    inc undocounter
+@maxcountreached2:
+    cpy #MAXUNDO
+    beq @zeroindex
+    inc undoindex
+    bra @movecomplete
+@zeroindex2:
+    stz undoindex
+
+@movecomplete:
     jsr printfield2
     jsr cls
-;    jsr printfield
 @done:
+
     rts
 
 moveplayerposition:
@@ -725,6 +754,7 @@ resetvars:
     sta ZP_PTR_UNDO+1
 
     lda #$0
+    sta undoindex
     sta undocounter
     rts
 
