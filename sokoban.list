@@ -246,7 +246,6 @@ Current file: sokoban.asm
 000000r 2               
 000000r 1               
 000000r 1               ; constants
-000000r 1               ;field = $100c; load for fields
 000000r 1               ZP_PTR_FIELD = $28
 000000r 1               temp = $30  ; used for temp 8/16 bit storage $30/$31
 000000r 1               
@@ -256,8 +255,6 @@ Current file: sokoban.asm
 000000r 1               LEVELHEADER = 10
 000000r 1               
 000000r 1               ; screen 16x16bit tile width/height
-000000r 1               ;SCREENWIDTH = 20
-000000r 1               ;SCREENHEIGHT = 15
 000000r 1               SCREENWIDTH = 40
 000000r 1               SCREENHEIGHT = 30
 000000r 1               .org $080D

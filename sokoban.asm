@@ -1,7 +1,6 @@
 .include "x16.inc"
 
 ; constants
-;field = $100c; load for fields
 ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 
@@ -11,8 +10,6 @@ CLEARSCREEN = 147
 LEVELHEADER = 10
 
 ; screen 16x16bit tile width/height
-;SCREENWIDTH = 20
-;SCREENHEIGHT = 15
 SCREENWIDTH = 40
 SCREENHEIGHT = 30
 .org $080D
