@@ -1,9 +1,6 @@
 .include "x16.inc"
 
 ; constants
-ZP_PTR_FIELD = $28
-temp = $30  ; used for temp 8/16 bit storage $30/$31
-
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
@@ -31,10 +28,7 @@ VERA_CTRL           = $9F25
 message:          .byte "press a key",0
 selectmessage:    .byte "select a level (",0
 selectendmessage: .byte "): ",0
-errormessage:     .byte "error loading file",0
 quitmessage:      .byte "press q to quit",0
-filename:         .byte "levels.bin"
-filename_end:
 winstatement:     .byte "goal reached!",0
 
 ; variables that the program uses during execution
@@ -45,12 +39,17 @@ no_goalsreached:.byte 0 ; static now, reset for each game
 fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
 fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
 vera_byte_low:  .byte 0
-vera_byte_mid: .byte 0
+vera_byte_mid:  .byte 0
+undostack:      .byte 0,0,0,0,0,0,0,0,0,0
+undocounter:    .byte 0
 
-; usage of zeropage pointers:
+; usage of zeropage address space:
 ; ZP_PTR_1 - temporary pointer
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
+ZP_PTR_FIELD = $28
+temp = $30  ; used for temp 8/16 bit storage $30/$31
+ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
 
 start:
     ; force uppercase
@@ -85,8 +84,14 @@ keyloop:
     bra @done
 @checkright:
     cmp #$1d
-    bne @checkquit
+    bne @checkundo
     jsr handleright
+    bra @done
+@checkundo:
+    cmp #$55 ; 'u'
+    bne @checkquit
+    jsr handle_undocommand
+    bra @done
 @checkquit:
     cmp #$51
     bne @done
@@ -100,6 +105,11 @@ keyloop:
     rts
 @donenextkey:
     jmp keyloop
+
+handle_undocommand:
+    ; nothing so far
+    jsr handle_undo_up
+    rts
 
 handleright:
     ; pointers
@@ -126,6 +136,30 @@ handleright:
     sta ZP_PTR_1+1
 
     jsr handlemove
+    rts
+
+handle_undo_right:
+    ; pointers
+    ; 3 - player
+    ; 2 - block to the right of the player
+    ; 1 - block to the left of the player, that will contain the player after this undo
+
+    clc
+    adc #$1
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_2+1
+
+    sec
+    lda ZP_PTR_3
+    sbc #$1
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_1+1
+
+    jsr handle_undomove
     rts
 
 handleleft:
@@ -156,6 +190,32 @@ handleleft:
 
 @done:
     rts
+
+handle_undo_left:
+    ; pointers
+    ; 3 - player
+    ; 2 - block to the left of the player
+    ; 1 - block to the right of the player, that will contain the player after this undo
+
+    clc
+    lda ZP_PTR_3
+    adc #$1
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_1+1
+
+    sec
+    lda ZP_PTR_3
+    sbc #$1
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_2
+
+    jsr handle_undomove
+    rts
+
 handleup:
     ; pointers
     ; 3 - player
@@ -187,7 +247,61 @@ handleup:
 
     jsr handlemove
 
+    ; store in undo stack
+;    lda undocounter
+;    cmp #$MAXUNDO-1
+;    beq @done ; maximum undo reached
+
+;@done:
+
+    rts
+
+handle_undo_up:
+    ; pointers
+    ; 3 - player
+    ; 2 - block to the bottom of the player, that will contain the player after this undo
+    ; 1 - block to the top of the player
+
+    ; temporary store player position in pointer 1
+    lda ZP_PTR_3
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sta ZP_PTR_1+1
+
+    clc
+    lda ZP_PTR_3
+    adc fieldwidth
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_2+1
+
+    jsr moveplayeronfield
+    jsr moveplayerposition
+
+    sec
+    lda ZP_PTR_1
+    sbc fieldwidth
+    sta ZP_PTR_2
+    lda ZP_PTR_2+1
+    sbc #$0
+    sta ZP_PTR_2+1
+    
+    ; now move 2=>1, if needed
+    ; <<<ONLY DEBUG CODE, THIS WILL DEPEND ON A COMBINED MOVE BBBBBIIIITTTTTT>>>>>
+    ldy #$0
+    lda (ZP_PTR_2),y
+    cmp #'$'
+    beq @movecrate
+    cmp #'*'
+    beq @movecrate
+    bra @done
+
+@movecrate:
+    jsr movecrateonfield
 @done:
+    jsr cls
+    jsr printfield2
     rts
 
 handledown:
@@ -220,6 +334,99 @@ handledown:
     sta ZP_PTR_1+1
 
     jsr handlemove
+    rts
+
+handle_undo_down:
+    ; pointers
+    ; 3 - player
+    ; 2 - block to the bottom of the player
+    ; 1 - block to the top of the player, that will contain the player after this undo
+
+    sec
+    lda ZP_PTR_3
+    sbc fieldwidth
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sbc #$0
+    sta ZP_PTR_1+1
+
+    clc
+    lda ZP_PTR_3
+    adc fieldwidth
+    sta ZP_PTR_2
+    lda ZP_PTR_3+1
+    adc #$0
+    sta ZP_PTR_2+1
+
+    jsr handle_undomove
+
+    rts
+
+handle_undomove:
+    ; input from pointers
+    ; 3 - player
+    ; 2 - backward destination of the player
+    ; 1 - block 'behind' the player, that will be put in the player's position after the undo
+
+
+    ; dummy undo up only
+    jsr moveplayeronfield
+    jsr moveplayerposition
+    jsr cls
+    jsr printfield2
+    rts
+
+    ; move the player 'back' first. Might return to a goal
+    ldy #$0
+    lda (ZP_PTR_1),y
+    cmp #'.'
+    beq @togoal
+    ; player will go to normal space
+    lda #'@'
+    sta (ZP_PTR_1),y
+    bra @next
+@togoal:
+    ; player will go to goal position
+    lda #'+'
+    sta (ZP_PTR_1),y
+@next:
+    ; move the crate back to the player's position. Player might have been standing on a goal
+    lda (ZP_PTR_3),y
+    cmp #'+'
+    beq @togoal2
+    ; crate will return as normal
+    lda #'$'
+    sta (ZP_PTR_1),y
+    bra @next2
+@togoal2:
+    ; crate will return to goal position
+    lda #'*'
+    sta (ZP_PTR_1),y
+@next2:
+    ; return empty space, check what was there in the first place
+    lda (ZP_PTR_2),y
+    cmp #'*'
+    beq @cratewasongoal
+    ; leave behind 'normal' goal
+    lda #'.'
+    sta (ZP_PTR_2),y
+    bra @next3
+@cratewasongoal:
+    ; leave behind empty space
+    lda #' '
+    sta (ZP_PTR_2),y
+@next3:
+
+    ; now return player pointer to new position
+    lda ZP_PTR_1
+    sta ZP_PTR_3
+    lda ZP_PTR_1+1
+    sta ZP_PTR_1+1
+
+    ; output the playing field
+    jsr printfield2
+    jsr cls
+
     rts
 
 handlemove:
@@ -343,7 +550,7 @@ moveplayeronfield:
     sta (ZP_PTR_3),y
     bra @done
 @movetonormalposition:
-    lda #'@'; crate symbol
+    lda #'@'; player symbol
     sta (ZP_PTR_2),y
     lda #'.'
     sta (ZP_PTR_3),y
@@ -511,6 +718,14 @@ resetvars:
     lda (ZP_PTR_1),y
     sta no_levels
 
+    ; reset undo stack
+    lda #<undostack
+    sta ZP_PTR_UNDO
+    lda #>undostack
+    sta ZP_PTR_UNDO+1
+
+    lda #$0
+    sta undocounter
     rts
 
 initfield:
