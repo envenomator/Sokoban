@@ -1,4 +1,3 @@
-//#define __USE_MINGW_ANSI_STDIO 1
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -43,13 +42,13 @@ int main(int argc, char *argv[])
     fptr = fopen(argv[1],"r");
     if(fptr == NULL)
     {
-        printf("Error opening inputfile\n");   
+        printf("Error opening \"%s\"\n",argv[1]);   
         exit(1);             
     }
     outptr = fopen(argv[2],"wb");
     if(outptr == NULL)
     {
-        printf("Error opening outputfile\n");
+        printf("Error opening \"%s\"\n",argv[2]);
         fclose(fptr);
         exit(1);
     }
@@ -131,35 +130,40 @@ int main(int argc, char *argv[])
     }
     rewind(fptr);
 
+    printf("%d levels present in \"%s\"\n",numlevels,argv[1]);
     // check the validity of each level and record for later use in calculating headers and level data
     errorlevels = 0;
     for(int n = 0; n < numlevels; n++)
     {
         validlevel[n] = true; // set as default, unless either width or height is out of spec
-        if(levelwidth[n] > MAXWIDTH)
+        if((levelwidth[n] > MAXWIDTH) || (levelheight[n] > MAXHEIGHT))
         {
-            printf("ERROR: Level %d is too wide\n",n+1);
-            validlevel[n] = false;
-        }
-        if(levelheight[n] > MAXHEIGHT)
-        {
-            printf("ERROR: Level %d is too high\n",n+1);
-            validlevel[n] = false;
+            printf("Removed level %d -",n+1);
+            if(levelwidth[n] > MAXWIDTH)
+            {
+                printf(" wider than %d cols",MAXWIDTH);
+                validlevel[n] = false;
+            }
+            if((levelwidth[n] > MAXWIDTH) && (levelheight[n] > MAXHEIGHT)) printf (" and");
+            if(levelheight[n] > MAXHEIGHT)
+            {
+                printf(" higher than %d rows",MAXHEIGHT);
+                validlevel[n] = false;
+            }
+            printf("\n");
         }
         if(levelgoals[n] > levelcrates[n])
         {
-            printf("ERROR: Level %d cannot be completed - not enough crates for the number of goals\n",n+1);
+            printf("Removed level %d - too many goals\n",n+1);
             validlevel[n] = false;
         }
         if(validlevel[n] == false) errorlevels++; // record for later use in calculating resulting levels
     }
+    printf("Removed %d invalid levels\n",errorlevels);
+    printf("Written %d valid levels to \"%s\"\n",numlevels - errorlevels,argv[2]);
 
-    // output results to the user
     if((numlevels - errorlevels) > 0)
     {
-        printf("%d levels in input file\n",numlevels);
-        printf("Writing %d valid levels to output file\n",numlevels - errorlevels);
-        
         // Produce file header information
         // OUTPUT LOAD ADDRESS for x16 LOAD function
         fprintf(outptr,"%c%c",(char)LOADADDRESS, LOADADDRESS>>8);
@@ -286,287 +290,3 @@ int get_cratesfromline(char *string)
     }
     return cratenum;
 }
-
-    /*
-    // calculate number of volume records/lines
-    t = getc(fptr);
-    while(t != EOF)
-    {
-        if(t == '\n') line++;
-        t = getc(fptr);
-    }
-    printf("Inputfile \"%s\" contains %d records\n",argv[1], line-1);
-    items = malloc((line-1) * sizeof(struct item));
-    if(items == NULL)
-    {
-        printf("Error allocating memory, no conversion done\n");
-        fclose(fptr);
-        fclose(outptr);
-        fclose(accoutptr);
-        exit(1);
-    }
-    rewind(fptr);
-    line = 1; // return to 1
-
-    // check if quotes are present in inputfile - check only first character!!
-    t = getc(fptr);
-    if(t == '\"'){
-        quotepresent = true;
-        tokencorrector = 0;
-    }
-    else {
-        quotepresent = false;
-        tokencorrector = 1;
-    }
-    rewind(fptr);
-
-    // loop through entire file, split in tokens and output selection
-    t = getc(fptr);
-    while(t != EOF){
-        if(t != '\n'){
-            // token parse loop
-            ungetc(t, fptr); // push character back to the queue
-            gettoken(fptr, token);
-            kolom++; // token gelezen -> kolom
-            if(present(kolommen, kolom))
-            {
-                if(kolom == CREATIONTIME)
-                {
-                    // Omzetten die handel
-                    if(line > 1)
-                    {
-                        month = monthnumber(token, quotepresent);
-                        fprintf(outptr, "\"%.2s-%02d-%.4s\"\t", token+9-tokencorrector, month,token+21-tokencorrector);
-                        snprintf(items[line-2].date,9,"%.4s%02d%.2s",token+21-tokencorrector,month,token+9-tokencorrector);
-                    }
-                    else fprintf(outptr, "\"Creation Date\"\t");
-                }
-                else if(kolom == VOLUMESIZE)
-                {
-                    if(line > 1)
-                    {
-                        if(!quotepresent)
-                        {
-                            //correctexponent(token); // make sure to correct e+ to e- notation
-                            //sscanf(token,"%lf",&sizef);
-                            //size = sizef;
-                            size = readfloatorinteger(token);
-                        }
-
-                        else {
-                            size = readfloatorinteger(token+1);
-                        }
-
-                        size /= 1073741824;
-                        fprintf(outptr,"\"%lld\"\t",size);
-                        items[line-2].size = size;
-                    }
-                    else fprintf(outptr, "\"Allocated Size (GiB)\"\t");
-                }
-                else fprintf(outptr, "%s\t",token);
-            }
-        }
-        else
-        {
-            // restart on new line
-            kolom = 0;
-            line++; // next line
-            putc('\n', outptr);
-        }
-        
-        t = getc(fptr);
-    }
-
-    // sort the array on date field
-    qsort(items,line-2,sizeof(struct item),comparedates);
-
-    // accumulate and tally the array to 2nd output file
-    // items[line-1] == last item
-    
-    fprintf(accoutptr, "\"Date\"\t\"New allocation (GiB)\"\t\"Total allocation (GiB)\"\t\n");
-    i = 0;
-    accumulator = 0;
-    daytotal = 0;
-    while(i < line-2)
-    {
-        tally = false;
-        accumulator += items[i].size;
-        daytotal += items[i].size;
-
-        if(i == line-3) // last line reached - don't look beyond last line
-        {
-            tally = true;
-        }
-        else
-        {
-            if(strcmp(items[i].date, items[i+1].date) != 0)
-            {
-                // next date is different, print out this one
-                tally = true;
-            }
-        }
-        if(tally == true)
-        {
-            fprintf(accoutptr, "\"%.2s-%.2s-%.4s\"\t\"%d\"\t\"%d\"\n",items[i].date+6,items[i].date+4,items[i].date,daytotal,accumulator);                            
-            daytotal = 0;            
-        }
-        i++; // next item in items[]
-    }
-
-    fclose(fptr);
-    fclose(outptr);
-    fclose(accoutptr);
-    free(items);
-    printf("Conversion complete, outputfile is \"%s\" and \"%s-accumulated\"\n", argv[2],argv[2]);
-    return 0;
-}
-
-bool present(int *list, int kolomid)
-{
-    while((*list) != 0)
-    {
-        if((*list) == kolomid) return true; // found!
-        list++;
-    }
-    return false;
-}
-
-void gettoken(FILE *fptr, char *buffer)
-{
-    char t = getc(fptr);
-
-    while(t != EOF)
-    {
-        if(t != DELIMITER)
-        {
-            (*buffer++) = t;
-            t = getc(fptr);
-        }
-        else
-        {
-            (*buffer) = 0; // terminate token string
-            t = EOF; // ensure end of loop
-        }
-    }
-}
-
-void correctexponent(char *token)
-{
-    while(*token != 0)
-    {
-        if(*token == '+') *token = '-'; // change E+ notation to E-
-        if(*token == 'E') *token = 'e'; // change E to e
-        if(*token == ',') *token = '.'; // change to US notation
-        token++;
-    }
-}
-
-__int64 readfloatorinteger(char *token)
-{
-    __int64 i = 0;
-    float base;
-    __int16 basemultiplier = 0, temp, exponent; // used for calculating how long the base is
-    char *t = token;
-    char *part2;
-    bool hasexponent = false;
-
-    correctexponent(token);
-    while(*t != 0)
-    {
-        // search to end-of-string for e or E
-        if(*t == 'e' || *t == 'E')
-        {
-            // this is an exponent number, split in two parts
-            // first calculate the base length up to e/E
-            basemultiplier = t - token - 2; // -1 to correct the ',' sign, -1 to correct for digit before ,/.
-            part2 = t + 2;
-            hasexponent = true;
-        }
-        t++;
-    }
-    if(hasexponent == true)
-    {
-        // scan in two parts
-        // first scan the exponent, so we can change it later
-        //sscanf(token, "%f", &base); // scan first double (without exponent)
-
-        // first scan the exponent
-        sscanf(part2, "%d", &exponent); // scan to temporary number
-
-        // now change the original exponent to E+00, so the scanf function for base works
-        *part2 = '0';
-        part2++;
-        *part2 = '0'; // resulting in baseE+00
-        sscanf(token, "%f", &base);
-
-        // do base*10^basemultiplier
-        temp = basemultiplier;
-        while(temp > 0)
-        {
-            // multiply the base number by 10^multiplier
-            // so if the number is 1,03 - we multiply by 100 to get at 103
-            base = base * 10;
-            temp--;
-        }
-        i = base; // first part of the result
-        // now multiply the base by 10 for each component left
-        temp = exponent - basemultiplier;
-        while(temp > 0)
-        {
-            i = i * 10;
-            temp--;
-        }
-    }
-    else sscanf(token, "%lld", &i); // scan as an integer
-    return i;
-}
-int monthnumber(char *token, bool quotepresent)
-{
-    int selection = 0;
-    if(quotepresent){
-        token += 5;
-    }
-    else token += 4;
-
-    for(int i = 0; i < 3; i++) selection += *(token+i);
-
-    switch (selection)
-    {
-        case 'J'+'a'+'n':
-            return 1;
-        case 'F'+'e'+'b':
-            return 2;
-        case 'M'+'a'+'r':
-            return 3;
-        case 'A'+'p'+'r':
-            return 4;
-        case 'M'+'a'+'y':
-            return 5;
-        case 'J'+'u'+'n':
-            return 6;
-        case 'J'+'u'+'l':
-            return 7;
-        case 'A'+'u'+'g':
-            return 8;
-        case 'S'+'e'+'p':
-            return 9;
-        case 'O'+'c'+'t':
-            return 10;
-        case 'N'+'o'+'v':
-            return 11;
-        case 'D'+'e'+'c':
-            return 12;
-        default:
-            return 0;
-    }
-}
-
-int comparedates(const void *p, const void *q)
-{
-    const struct item *p1 = p;
-    const struct item *q1 = q;
-    int result = strcmp(p1->date, q1->date);
-
-    return result;
-}
-*/
