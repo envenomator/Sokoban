@@ -5,7 +5,6 @@
 ZP_PTR_FIELD = $28
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 
-LOADSTART = $2000  
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
@@ -1026,3 +1025,4 @@ goal:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 crateongoal:
 .incbin "tiles/crateongoal.bin"
+LOADSTART:

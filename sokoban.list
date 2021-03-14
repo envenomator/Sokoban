@@ -250,7 +250,6 @@ Current file: sokoban.asm
 000000r 1               ZP_PTR_FIELD = $28
 000000r 1               temp = $30  ; used for temp 8/16 bit storage $30/$31
 000000r 1               
-000000r 1               LOADSTART = $2000
 000000r 1               NEWLINE = $0D
 000000r 1               UPPERCASE = $8E
 000000r 1               CLEARSCREEN = 147
@@ -787,9 +786,9 @@ Current file: sokoban.asm
 000B04  1               
 000B04  1                   ; load field pointer to first address at LOADSTART
 000B04  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000B04  1  A9 00            lda #<LOADSTART
+000B04  1  A9 BA            lda #<LOADSTART
 000B06  1  85 00            sta ZP_PTR_1
-000B08  1  A9 20            lda #>LOADSTART
+000B08  1  A9 13            lda #>LOADSTART
 000B0A  1  85 01            sta ZP_PTR_1+1
 000B0C  1               
 000B0C  1                   ; load number of levels, pointed to by ZP_PTR_1,0
@@ -802,9 +801,9 @@ Current file: sokoban.asm
 000B14  1               initfield:
 000B14  1                   ; load field pointer to first address at LOADSTART
 000B14  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000B14  1  A9 00            lda #<LOADSTART
+000B14  1  A9 BA            lda #<LOADSTART
 000B16  1  85 00            sta ZP_PTR_1
-000B18  1  A9 20            lda #>LOADSTART
+000B18  1  A9 13            lda #>LOADSTART
 000B1A  1  85 01            sta ZP_PTR_1+1
 000B1C  1               
 000B1C  1                   ; skip to the first header, two bytes next
@@ -1385,4 +1384,5 @@ Current file: sokoban.asm
 0012BA  1  65 65 65 65  .incbin "tiles/crateongoal.bin"
 0012BE  1  65 65 65 65  
 0012C2  1  65 65 65 65  
-0012BA  1               
+0013BA  1               LOADSTART:
+0013BA  1               

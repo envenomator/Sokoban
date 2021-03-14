@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "loadstart.h"
 
-#define LOADADDRESS 0x2000 
+//#define LOADADDRESS is imported from loadstart.h
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
@@ -16,6 +17,7 @@ char linebuffer[BUFFERSIZE];
 int getplayerpos(char *string);
 int get_goalsfromline(char *string);
 int get_cratesfromline(char *string);
+bool isdataline(char *string);
 
 int main(int argc, char *argv[])
 {
@@ -84,14 +86,18 @@ int main(int argc, char *argv[])
         else
         {
             outputlength = strlen(linebuffer) - 1;  // remove EOL character at the end of the string
-            if(outputlength) // payload or empty line?
+            if(outputlength) // line has payload data
             {
-                // store maximum width at this level
-                if(levelwidth[level-1] < outputlength) levelwidth[level-1] = outputlength;
+                if(isdataline(linebuffer)) // line without comments, just the data
+                {
+                    // store maximum width at this level
+                    if(levelwidth[level-1] < outputlength) levelwidth[level-1] = outputlength;
 
-                levelheight[level-1]++; // add another line to this level
-                levelgoals[level-1] += get_goalsfromline(linebuffer);
-                levelcrates[level-1] += get_cratesfromline(linebuffer);
+                    levelheight[level-1]++; // add another line to this level
+                    levelgoals[level-1] += get_goalsfromline(linebuffer);
+                    levelcrates[level-1] += get_cratesfromline(linebuffer);
+
+                }
             }
         }
     }
@@ -112,18 +118,20 @@ int main(int argc, char *argv[])
         else
         {
             outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
-            // empty line, or payload?
-            if(outputlength)
+            if(outputlength) // line has payload
             {
-                if(playerfound == false)
+                if(isdataline(linebuffer)) // line without comments, just the data
                 {
-                    playerpos = getplayerpos(linebuffer);
-                    if(playerpos)
+                    if(playerfound == false)
                     {
-                        leveloffset[level-1] += playerpos;
-                        playerfound = true;
+                        playerpos = getplayerpos(linebuffer);
+                        if(playerpos)
+                        {
+                            leveloffset[level-1] += playerpos;
+                            playerfound = true;
+                        }
+                        else leveloffset[level-1] += levelwidth[level-1];
                     }
-                    else leveloffset[level-1] += levelwidth[level-1];
                 }
             }
         }
@@ -227,13 +235,16 @@ int main(int argc, char *argv[])
                 if((level > 0) && (validlevel[level-1])) // only output valid level(s) - ignore the rest
                 {
                     outputlength = strlen(linebuffer) - 1; //compensate EOL / CR/LF
-                    if(outputlength) // payload, or empty line
+                    if(outputlength) // line has payload
                     {
-                        // now need to padd to max length with zeroes
-                        for(int n = 0; n < levelwidth[level-1]; n++)
+                        if(isdataline(linebuffer)) // line without comments, just the data
                         {
-                            if(n < outputlength) fprintf(outptr,"%c",linebuffer[n]);
-                            else fprintf(outptr,"%c",0);
+                            // now need to padd to max length with zeroes
+                            for(int n = 0; n < levelwidth[level-1]; n++)
+                            {
+                                if(n < outputlength) fprintf(outptr,"%c",linebuffer[n]);
+                                else fprintf(outptr,"%c",0);
+                            }
                         }
                     }
                 }
@@ -289,4 +300,11 @@ int get_cratesfromline(char *string)
         string++;
     }
     return cratenum;
+}
+
+bool isdataline(char *string)
+{
+    bool data;
+    data = (*string == ' ') || (*string == '#') || (*string == '@') || (*string == '$') || (*string == '.') || (*string == '+') || (*string == '*');
+    return data;
 }
