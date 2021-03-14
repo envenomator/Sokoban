@@ -55,36 +55,11 @@ vera_byte_mid: .byte 0
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
 
-loadlevels:
-    ; loads all levels from the file 'LEVELS.BIN'
-    lda #filename_end - filename
-    ldx #<filename
-    ldy #>filename
-    jsr SETNAM
-    lda #$01
-    ldx #$08
-    ldy #$01
-    jsr SETLFS
-    lda #$00 ; load to memory
-    jsr LOAD
-    ; sets carry flag on error, handled by upstream caller
-    rts
-
 start:
     ; force uppercase
     lda #UPPERCASE
     jsr CHROUT
 
-    jsr loadlevels
-    bcc @next
-    ; error
-    lda #<errormessage
-    sta ZP_PTR_1
-    lda #>errormessage
-    sta ZP_PTR_1+1
-    jsr printline
-    rts ; exit program
-@next:
     jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
@@ -572,12 +547,18 @@ initfield:
     sta ZP_PTR_1+1
     bra @loop
 @fieldptrdone:
-    ldy #0  ; index to the payload pointer itself
+    ldy #0  ; index to the offset from LOADSTART 
+    ; add LOADSTART address to the offset in this field
+    clc
     lda (ZP_PTR_1),y
+    adc #<LOADSTART
     sta ZP_PTR_FIELD
     iny
     lda (ZP_PTR_1),y
+    adc #>LOADSTART
     sta ZP_PTR_FIELD+1
+    ; ZP_PTR_FIELD now contains the actual address in memory, not only the offset from the data
+
     ldy #2  ; index from payload pointer to width variable (low byte)
     lda (ZP_PTR_1),y 
     sta fieldwidth
@@ -588,12 +569,16 @@ initfield:
     lda (ZP_PTR_1),y
     sta no_goals
     ldy #8  ; index from payload pointer to player ptr in this level
+
+    clc
     lda (ZP_PTR_1),y
+    adc #<LOADSTART
     sta ZP_PTR_3
     iny
     lda (ZP_PTR_1),y
+    adc #>LOADSTART
     sta ZP_PTR_3+1
-
+    ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
     rts
 
 printfield:
@@ -1026,3 +1011,4 @@ goal:
 crateongoal:
 .incbin "tiles/crateongoal.bin"
 LOADSTART:
+.incbin "LEVELS.BIN"

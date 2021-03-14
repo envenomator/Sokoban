@@ -3,9 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "loadstart.h"
 
-//#define LOADADDRESS is imported from loadstart.h
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 10
 #define BUFFERSIZE 128
@@ -172,9 +170,6 @@ int main(int argc, char *argv[])
 
     if((numlevels - errorlevels) > 0)
     {
-        // Produce file header information
-        // OUTPUT LOAD ADDRESS for x16 LOAD function
-        fprintf(outptr,"%c%c",(char)LOADADDRESS, LOADADDRESS>>8);
         // OUTPUT #LEVELS as 16-bit integer
         fprintf(outptr,"%c%c",(char)(numlevels-errorlevels), (char)((numlevels-errorlevels)>>8));
 
@@ -202,7 +197,7 @@ int main(int argc, char *argv[])
             {
                 if(fieldptr == 0) // is this the first valid level?
                 {
-                    fieldptr = LOADADDRESS + LOADADDRESSIZE + (HEADERSIZE * (numlevels - errorlevels));
+                    fieldptr = LOADADDRESSIZE + (HEADERSIZE * (numlevels - errorlevels));
                 }
                 else
                 {
