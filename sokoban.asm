@@ -109,9 +109,37 @@ keyloop:
     jmp keyloop
 
 handle_undocommand:
-    ; nothing so far
-    ;jsr handle_undo_up
     jsr pull_undostack
+    ; x now contains previous move
+    ;   as #%000MUDRL - Multiple move / Up / Down / Right / Left
+    ;
+    ; we will give x to the handle_undo_**** routine, so it can see the combined bit (4) and act on it
+@checkup:
+    txa
+    and #%00001000
+    beq @checkdown
+    jsr handle_undo_up
+    rts
+@checkdown:
+    txa
+    and #%00000100
+    beq @checkright
+    jsr handle_undo_down
+    rts
+@checkright:
+    txa
+    and #%00000010
+    beq @checkleft
+    jsr handle_undo_right
+    rts
+@checkleft:
+    txa
+    and #%00000001
+    beq @emptystack
+    jsr handle_undo_left
+    rts
+@emptystack:
+    ; do nothing
     rts
 
 handleright:
@@ -143,27 +171,48 @@ handleright:
     rts
 
 handle_undo_right:
-    ; pointers
     ; 3 - player
-    ; 2 - block to the right of the player
-    ; 1 - block to the left of the player, that will contain the player after this undo
 
-    clc
-    adc #$1
-    sta ZP_PTR_2
+    phx ; store x to stack
+    ; point 1 to player
+
+    lda ZP_PTR_3
+    sta ZP_PTR_1
     lda ZP_PTR_3+1
-    adc #$0
-    sta ZP_PTR_2+1
+    sta ZP_PTR_1+1
 
+    ; pointer 2 will point to the left of the player
+    ; so the player will move back to the left
     sec
     lda ZP_PTR_3
     sbc #$1
-    sta ZP_PTR_1
+    sta ZP_PTR_2
     lda ZP_PTR_3+1
     sbc #$0
-    sta ZP_PTR_1+1
+    sta ZP_PTR_2+1
 
-    jsr handle_undomove
+    jsr moveplayeronfield
+    jsr moveplayerposition
+
+    ; check crate move, and if so, move it using pointer 2 -> 1
+    plx
+    txa
+    and #%00010000 ; was a crate moved in this move?
+    beq @done
+
+    ; load pointer 2 to the right of the previous player's position
+    clc
+    lda ZP_PTR_1
+    adc #$1
+    sta ZP_PTR_2
+    lda ZP_PTR_1+1
+    adc #$0
+    sta ZP_PTR_2+1
+    
+    jsr movecrateonfield
+@done:
+    jsr cls
+    jsr printfield2
     rts
 
 handleleft:
@@ -197,28 +246,48 @@ handleleft:
     rts
 
 handle_undo_left:
-    ; pointers
     ; 3 - player
-    ; 2 - block to the left of the player
-    ; 1 - block to the right of the player, that will contain the player after this undo
 
+    phx ; store x to stack
+
+    ; point 1 to player
+    lda ZP_PTR_3
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sta ZP_PTR_1+1
+
+    ; pointer 2 will point to the right of the player
+    ; so the player will move back to the right
     clc
     lda ZP_PTR_3
     adc #$1
-    sta ZP_PTR_1
+    sta ZP_PTR_2
     lda ZP_PTR_3+1
     adc #$0
-    sta ZP_PTR_1+1
+    sta ZP_PTR_2+1
 
+    jsr moveplayeronfield
+    jsr moveplayerposition
+
+    ; check crate move, and if so, move it using pointer 2 -> 1
+    plx
+    txa
+    and #%00010000 ; was a crate moved in this move?
+    beq @done
+
+    ; load pointer 2 to the left of the previous player's position
     sec
-    lda ZP_PTR_3
+    lda ZP_PTR_1
     sbc #$1
     sta ZP_PTR_2
-    lda ZP_PTR_3+1
+    lda ZP_PTR_1+1
     sbc #$0
-    sta ZP_PTR_2
-
-    jsr handle_undomove
+    sta ZP_PTR_2+1
+    
+    jsr movecrateonfield
+@done:
+    jsr cls
+    jsr printfield2
     rts
 
 handleup:
@@ -256,17 +325,18 @@ handleup:
     rts
 
 handle_undo_up:
-    ; pointers
     ; 3 - player
-    ; 2 - block to the bottom of the player, that will contain the player after this undo
-    ; 1 - block to the top of the player
 
-    ; temporary store player position in pointer 1
+    phx ; store x to stack
+
+    ; point 1 to player
     lda ZP_PTR_3
     sta ZP_PTR_1
     lda ZP_PTR_3+1
     sta ZP_PTR_1+1
 
+    ; pointer 2 will point to the position down of the player
+    ; so the player will move back down
     clc
     lda ZP_PTR_3
     adc fieldwidth
@@ -278,25 +348,21 @@ handle_undo_up:
     jsr moveplayeronfield
     jsr moveplayerposition
 
+    ; check crate move, and if so, move it using pointer 2 -> 1
+    plx
+    txa
+    and #%00010000 ; was a crate moved in this move?
+    beq @done
+
+    ; load pointer 2 to the top of the previous player's position
     sec
     lda ZP_PTR_1
     sbc fieldwidth
     sta ZP_PTR_2
-    lda ZP_PTR_2+1
+    lda ZP_PTR_1+1
     sbc #$0
     sta ZP_PTR_2+1
     
-    ; now move 2=>1, if needed
-    ; <<<ONLY DEBUG CODE, THIS WILL DEPEND ON A COMBINED MOVE BBBBBIIIITTTTTT>>>>>
-    ldy #$0
-    lda (ZP_PTR_2),y
-    cmp #'$'
-    beq @movecrate
-    cmp #'*'
-    beq @movecrate
-    bra @done
-
-@movecrate:
     jsr movecrateonfield
 @done:
     jsr cls
@@ -334,37 +400,56 @@ handledown:
 
     ldx #%00000100 ; down direction
     jsr handlemove
-
     
     rts
 
 handle_undo_down:
-    ; pointers
     ; 3 - player
-    ; 2 - block to the bottom of the player
-    ; 1 - block to the top of the player, that will contain the player after this undo
 
+    phx ; store x to stack
+
+    ; point 1 to player
+    lda ZP_PTR_3
+    sta ZP_PTR_1
+    lda ZP_PTR_3+1
+    sta ZP_PTR_1+1
+
+    ; pointer 2 will point to the position up of the player
+    ; so the player will move back up
     sec
     lda ZP_PTR_3
     sbc fieldwidth
-    sta ZP_PTR_1
-    lda ZP_PTR_3+1
-    sbc #$0
-    sta ZP_PTR_1+1
-
-    clc
-    lda ZP_PTR_3
-    adc fieldwidth
     sta ZP_PTR_2
     lda ZP_PTR_3+1
-    adc #$0
+    sbc #$0
     sta ZP_PTR_2+1
 
-    jsr handle_undomove
+    jsr moveplayeronfield
+    jsr moveplayerposition
 
+    ; check crate move, and if so, move it using pointer 2 -> 1
+    plx
+    txa
+    and #%00010000 ; was a crate moved in this move?
+    beq @done
+
+    ; load pointer 2 to the bottom of the previous player's position
+    clc
+    lda ZP_PTR_1
+    adc fieldwidth
+    sta ZP_PTR_2
+    lda ZP_PTR_1+1
+    adc #$0
+    sta ZP_PTR_2+1
+    
+    jsr movecrateonfield
+@done:
+    jsr cls
+    jsr printfield2
     rts
 
-handle_undomove:
+
+handle_undomove_old:
     ; input from pointers
     ; 3 - player
     ; 2 - backward destination of the player
@@ -461,14 +546,14 @@ handlemove:
     beq @combinedmovecheck
     cmp #'*' ; crate on goal next to player?
     beq @combinedmovecheck
-    bra @done ; something else not able to push
+    bra @ignore ; something else not able to push
 @combinedmovecheck:
     lda (ZP_PTR_1),y
     cmp #' ' ; space after crate?
     beq @combinedmove
     cmp #'.' ; goal after crate?
     beq @combinedmove
-    bra @done ; nothing to move
+    bra @ignore ; nothing to move
 @combinedmove:
     jsr movecrateonfield
     jsr moveplayeronfield
@@ -483,7 +568,10 @@ handlemove:
 @movecomplete:
     jsr printfield2
     jsr cls
-@done:
+    rts
+
+@ignore: ; nothing to move
+    plx  ; don't forget to remove the stacked x move
     rts
 
 push_undostack:
@@ -495,18 +583,19 @@ push_undostack:
     txa
     ldy undoindex
     sta (ZP_PTR_UNDO),y
+
+    cpy #MAXUNDO-1 ; at last physical item in memory? then loop around
+    beq @loopindex
+    inc undoindex
+    bra @checkmaxcount
+ @loopindex:
+    stz undoindex
+ @checkmaxcount:
     lda undocounter
     cmp #MAXUNDO
-    beq @maxcountreached
+    beq @done ; maximum count reached / stack will loop around
     inc undocounter
-@maxcountreached:
-    cpy #MAXUNDO
-    beq @zeroindex
-    inc undoindex
-    bra @done
-@zeroindex:
-    stz undoindex
-@done:
+ @done:
     rts
 
 pull_undostack:
@@ -515,23 +604,21 @@ pull_undostack:
     ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
 
     lda undocounter ; check if we have any moves pushed to the stack
-    cmp #$0
     bne @stackedmoves
     ldx #$0 ; empty move, nothing in the stack
     rts
 
 @stackedmoves:
-    ; stack has moves pushed to it, check it's index
+    dec undocounter ; reduce the number pushed to the stack with 1
     ldy undoindex
     cpy #$0 ; index at first position?
     bne @normalindex
-    ldy #MAXUNDO ; move it to the 'previous' index position in a circular manner
+    ldy #MAXUNDO-1 ; move it to the 'previous' index position in a circular manner
     bra @next
 @normalindex:
     dey ; move it to the 'previous' index position
 @next:
     sty undoindex
-    dec undocounter ; reduce the number pushed to the stack with 1
     ; y now points to the previous move, as an index to the stack memory
     lda (ZP_PTR_UNDO),y
     tax
@@ -783,9 +870,8 @@ resetvars:
     lda #>undostack
     sta ZP_PTR_UNDO+1
 
-    lda #$0
-    sta undoindex
-    sta undocounter
+    stz undoindex
+    stz undocounter
     rts
 
 initfield:
