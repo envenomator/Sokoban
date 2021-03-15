@@ -110,7 +110,8 @@ keyloop:
 
 handle_undocommand:
     ; nothing so far
-    jsr handle_undo_up
+    ;jsr handle_undo_up
+    jsr pull_undostack
     rts
 
 handleright:
@@ -137,6 +138,7 @@ handleright:
     adc #$0
     sta ZP_PTR_1+1
 
+    ldx #%00000010 ; right direction
     jsr handlemove
     rts
 
@@ -188,6 +190,7 @@ handleleft:
     sbc #$0
     sta ZP_PTR_1+1
 
+    ldx #%00000001 ; left direction
     jsr handlemove
 
 @done:
@@ -329,6 +332,7 @@ handledown:
     adc #$0
     sta ZP_PTR_1+1
 
+    ldx #%00000100 ; down direction
     jsr handlemove
 
     
@@ -447,21 +451,8 @@ handlemove:
     jsr moveplayeronfield
     jsr moveplayerposition
 
-    ; record single move to undo stack
-    pla
-    ldy undoindex
-    sta (ZP_PTR_UNDO),y
-    lda undocounter
-    cmp #MAXUNDO
-    beq @maxcountreached
-    inc undocounter
-@maxcountreached:
-    cpy #MAXUNDO
-    beq @zeroindex
-    inc undoindex
-    bra @movecomplete
-@zeroindex:
-    stz undoindex
+    plx ; pull direction from the stack
+    jsr push_undostack
     bra @movecomplete
 @next:
     ldy #0
@@ -485,26 +476,65 @@ handlemove:
 
     ; record combined move to undo stack
     pla
-    ora #%0010000   ; set 'combined' bit 4
-    ldy undoindex
-    sta (ZP_PTR_UNDO),y
-    lda undocounter
-    cmp #MAXUNDO
-    beq @maxcountreached2
-    inc undocounter
-@maxcountreached2:
-    cpy #MAXUNDO
-    beq @zeroindex
-    inc undoindex
-    bra @movecomplete
-@zeroindex2:
-    stz undoindex
+    ora #%00010000   ; set 'combined' bit 4
+    tax
+    jsr push_undostack
 
 @movecomplete:
     jsr printfield2
     jsr cls
 @done:
+    rts
 
+push_undostack:
+    ; record single move to undo stack
+    ; x contains direction and single/multiple move
+    ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
+    ;
+    ; the stack index 'pointer' undoindex points to a new entry each time
+    txa
+    ldy undoindex
+    sta (ZP_PTR_UNDO),y
+    lda undocounter
+    cmp #MAXUNDO
+    beq @maxcountreached
+    inc undocounter
+@maxcountreached:
+    cpy #MAXUNDO
+    beq @zeroindex
+    inc undoindex
+    bra @done
+@zeroindex:
+    stz undoindex
+@done:
+    rts
+
+pull_undostack:
+    ; remove single move from undo stack
+    ; afterwards, x contains direction and single/multiple move
+    ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
+
+    lda undocounter ; check if we have any moves pushed to the stack
+    cmp #$0
+    bne @stackedmoves
+    ldx #$0 ; empty move, nothing in the stack
+    rts
+
+@stackedmoves:
+    ; stack has moves pushed to it, check it's index
+    ldy undoindex
+    cpy #$0 ; index at first position?
+    bne @normalindex
+    ldy #MAXUNDO ; move it to the 'previous' index position in a circular manner
+    bra @next
+@normalindex:
+    dey ; move it to the 'previous' index position
+@next:
+    sty undoindex
+    dec undocounter ; reduce the number pushed to the stack with 1
+    ; y now points to the previous move, as an index to the stack memory
+    lda (ZP_PTR_UNDO),y
+    tax
     rts
 
 moveplayerposition:
