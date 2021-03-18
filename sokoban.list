@@ -1407,8 +1407,8 @@ Current file: sokoban.asm
 000E6A  1               
 000E6A  1               displayhelp:
 000E6A  1  18               clc ; go to x,y
-000E6B  1  A0 2D            ldy #45
-000E6D  1  A2 16            ldx #22
+000E6B  1  A0 32            ldy #50
+000E6D  1  A2 17            ldx #23
 000E6F  1               
 000E6F  1  20 F0 FF         jsr PLOT
 000E72  1  A9 51            lda #<help0
@@ -1417,7 +1417,7 @@ Current file: sokoban.asm
 000E78  1  85 01            sta ZP_PTR_1+1
 000E7A  1  20 1F 0C         jsr print
 000E7D  1               
-000E7D  1  A2 1D            ldx #29
+000E7D  1  A2 1E            ldx #30
 000E7F  1  20 F0 FF         jsr PLOT
 000E82  1  A9 5F            lda #<help1
 000E84  1  85 00            sta ZP_PTR_1
@@ -1425,7 +1425,7 @@ Current file: sokoban.asm
 000E88  1  85 01            sta ZP_PTR_1+1
 000E8A  1  20 1F 0C         jsr print
 000E8D  1               
-000E8D  1  A2 1F            ldx #31
+000E8D  1  A2 20            ldx #32
 000E8F  1  20 F0 FF         jsr PLOT
 000E92  1  A9 73            lda #<help2
 000E94  1  85 00            sta ZP_PTR_1
@@ -1433,7 +1433,7 @@ Current file: sokoban.asm
 000E98  1  85 01            sta ZP_PTR_1+1
 000E9A  1  20 1F 0C         jsr print
 000E9D  1               
-000E9D  1  A2 20            ldx #32
+000E9D  1  A2 21            ldx #33
 000E9F  1  20 F0 FF         jsr PLOT
 000EA2  1  A9 89            lda #<help3
 000EA4  1  85 00            sta ZP_PTR_1
@@ -1441,7 +1441,7 @@ Current file: sokoban.asm
 000EA8  1  85 01            sta ZP_PTR_1+1
 000EAA  1  20 1F 0C         jsr print
 000EAD  1               
-000EAD  1  A2 21            ldx #33
+000EAD  1  A2 22            ldx #34
 000EAF  1  20 F0 FF         jsr PLOT
 000EB2  1  A9 97            lda #<help4
 000EB4  1  85 00            sta ZP_PTR_1
@@ -1732,6 +1732,7 @@ Current file: sokoban.asm
 001080  1  FF 03 00 00  .incbin "tiles/titlescreen.bin"
 001084  1  00 00 00 00  
 001088  1  FF 03 FF 03  
+002080  1               
 002080  1               tiledata:
 002080  1               black:
 002080  1  00 00 00 00  .incbin "tiles/black.bin"
@@ -1754,9 +1755,9 @@ Current file: sokoban.asm
 002484  1  00 00 00 00  
 002488  1  00 00 00 00  
 002580  1               crateongoal:
-002580  1  65 65 65 65  .incbin "tiles/crateongoal.bin"
-002584  1  65 65 65 65  
-002588  1  65 65 65 65  
+002580  1  57 57 57 57  .incbin "tiles/crateongoal.bin"
+002584  1  57 57 57 57  
+002588  1  57 57 57 57  
 002680  1               LOADSTART:
 002680  1  32 00 F6 01  .incbin "levels.bin"
 002684  1  13 00 0B 00  

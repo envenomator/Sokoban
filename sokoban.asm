@@ -1142,8 +1142,8 @@ displaytitlescreen:
 
 displayhelp:
     clc ; go to x,y
-    ldy #45
-    ldx #22
+    ldy #50
+    ldx #23
 
     jsr PLOT
     lda #<help0
@@ -1152,7 +1152,7 @@ displayhelp:
     sta ZP_PTR_1+1
     jsr print
 
-    ldx #29
+    ldx #30
     jsr PLOT
     lda #<help1
     sta ZP_PTR_1
@@ -1160,7 +1160,7 @@ displayhelp:
     sta ZP_PTR_1+1
     jsr print
 
-    ldx #31
+    ldx #32
     jsr PLOT
     lda #<help2
     sta ZP_PTR_1
@@ -1168,7 +1168,7 @@ displayhelp:
     sta ZP_PTR_1+1
     jsr print
 
-    ldx #32
+    ldx #33
     jsr PLOT
     lda #<help3
     sta ZP_PTR_1
@@ -1176,7 +1176,7 @@ displayhelp:
     sta ZP_PTR_1+1
     jsr print
 
-    ldx #33
+    ldx #34
     jsr PLOT
     lda #<help4
     sta ZP_PTR_1
