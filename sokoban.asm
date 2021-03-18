@@ -30,7 +30,12 @@ message:          .byte "press a key",0
 selectmessage:    .byte "select a level (",0
 selectendmessage: .byte "): ",0
 quitmessage:      .byte "press q to quit",0
-winstatement:     .byte "goal reached!",0
+winstatement:     .byte "level complete!",0
+help0:            .byte "(c)2021 venom",0
+help1:            .byte "keyboard shortcuts:",0
+help2:            .byte "cursor - moves player",0
+help3:            .byte "     q - quit",0
+help4:            .byte "     u - undo",0
 
 ; variables that the program uses during execution
 currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
@@ -61,8 +66,13 @@ start:
     jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
+    jsr cleartiles
+
+    jsr displaytitlescreen
 
     jsr selectlevel
+    jsr cleartiles      ; cls tiles
+
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
 ;    jsr printfield
@@ -723,6 +733,7 @@ moveplayeronfield:
 print:
     ; print from address ZP_PTR_1
     ; don't end with newline character
+    phy
     ldy #0
 @loop:
     lda (ZP_PTR_1),y ; load character from address
@@ -731,6 +742,7 @@ print:
     iny
     bra @loop
 @done:
+    ply
     rts
 
 printline:
@@ -789,6 +801,13 @@ selectlevel:
 
 @mainloop:
     jsr cls
+    jsr displayhelp
+
+    clc         ; PLOT to x,y
+    ldy #0      ; column 
+    ldx #45     ; row 
+    jsr PLOT
+
     ; print selection message
     lda #<selectmessage
     sta ZP_PTR_1
@@ -1058,6 +1077,140 @@ loadtiles:
     
     rts
 
+displaytitlescreen:
+
+; Fill the Layer 0 with the titlescreen tileset
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    lda #$40
+    sta VERA_MID                        ; Set Middle Byte to $40
+    lda #$0
+    sta VERA_LOW                        ; Set Low Byte to $00
+
+    ; address to the tileset
+    lda #<titlescreen
+    sta ZP_PTR_1
+    lda #>titlescreen
+    sta ZP_PTR_1+1
+
+;    ldy #0
+;@loop:
+;    lda (ZP_PTR_1),y
+;    clc
+;    adc #$1
+;    sta VERA_DATA0
+;    stz VERA_DATA0
+;    iny
+;    iny
+;    cpy #128
+;    bne @loop
+
+    ldy #64
+@outerloop:
+    ldx #64
+@innerloop:
+    phy
+    ldy #0
+    lda (ZP_PTR_1),y                    ; load byte from tileset
+    bne @else    
+@brick:
+    lda #$1     ; brick tile
+    bra @next
+@else:
+    lda #$0     ; black tile
+@next:
+    sta VERA_DATA0
+    stz VERA_DATA0
+    ply
+
+    ; increase pointer to next byte in the set
+    lda ZP_PTR_1
+    clc
+    adc #$2
+    sta ZP_PTR_1
+    lda ZP_PTR_1+1
+    adc #$0
+    sta ZP_PTR_1+1
+
+    dex
+    bne @innerloop
+    dey
+    bne @outerloop
+
+    rts
+
+displayhelp:
+    clc ; go to x,y
+    ldy #45
+    ldx #22
+
+    jsr PLOT
+    lda #<help0
+    sta ZP_PTR_1
+    lda #>help0
+    sta ZP_PTR_1+1
+    jsr print
+
+    ldx #29
+    jsr PLOT
+    lda #<help1
+    sta ZP_PTR_1
+    lda #>help1
+    sta ZP_PTR_1+1
+    jsr print
+
+    ldx #31
+    jsr PLOT
+    lda #<help2
+    sta ZP_PTR_1
+    lda #>help2
+    sta ZP_PTR_1+1
+    jsr print
+
+    ldx #32
+    jsr PLOT
+    lda #<help3
+    sta ZP_PTR_1
+    lda #>help3
+    sta ZP_PTR_1+1
+    jsr print
+
+    ldx #33
+    jsr PLOT
+    lda #<help4
+    sta ZP_PTR_1
+    lda #>help4
+    sta ZP_PTR_1+1
+    jsr print
+    rts
+
+cleartiles:
+; Fill the Layer 0 with all zeros (black)
+    stz VERA_CTRL                       ; Use Data Register 0
+    lda #$10
+    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+    lda #$40
+    sta VERA_MID                        ; Set Middle Byte to $40
+    lda #$0
+    sta VERA_LOW                        ; Set Low Byte to $00
+
+    lda #0
+    sta VERA_DATA0
+    sta VERA_DATA0
+
+    ldy #64
+    lda #0
+:   ldx #64
+:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+    sta VERA_DATA0                      ; Write Attribute
+    dex
+    bne :-
+    dey
+    bne :--
+
+    rts
+
 layerconfig:
 ; Configure Layer 0
     lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
@@ -1310,63 +1463,21 @@ printdecimal2:
     pla
     rts
 
+titlescreen:
+.incbin "tiles/titlescreen.bin"
+
 tiledata:
 black:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+.incbin "tiles/black.bin"
 Brick:
-    .byte 8,8,8,8,8,8,8,229,8,8,8,8,8,8,8,8
-    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
-    .byte 42,42,42,42,42,42,41,229,8,42,44,42,42,42,42,42
-    .byte 42,42,44,44,42,42,41,229,8,42,42,42,42,42,42,42
-    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,42,42,42
-    .byte 42,42,42,42,42,42,41,229,8,42,42,42,42,41,41,42
-    .byte 41,41,41,41,41,41,41,229,8,41,41,41,41,41,41,41
-    .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
-    .byte 229,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8
-    .byte 229,8,8,42,44,44,42,42,42,42,42,42,42,42,42,41
-    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
-    .byte 229,8,42,42,42,42,41,41,42,42,42,42,42,42,42,41
-    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,41,42,41
-    .byte 229,8,42,42,42,42,42,42,42,42,42,42,42,42,42,41
-    .byte 229,8,41,41,41,41,41,41,41,41,41,41,41,41,41,41
-    .byte 229,229,229,229,229,229,229,229,229,229,229,229,229,229,229,229
+.incbin "tiles/brick.bin"
 player:
 .incbin "tiles/player.bin"
 crate:
 .incbin "tiles/crate.bin"
 goal:
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,$72,$72,$72,$72,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+.incbin "tiles/goal.bin"
 crateongoal:
 .incbin "tiles/crateongoal.bin"
 LOADSTART:
-.incbin "LEVELS.BIN"
+.incbin "levels.bin"
