@@ -268,7 +268,7 @@ Current file: sokoban.asm
 00080D  1               VERA_DATA0          = $9F23
 00080D  1               VERA_CTRL           = $9F25
 00080D  1               
-00080D  1  4C CF 08        jmp start
+00080D  1  4C 04 09        jmp start
 000810  1               
 000810  1               ; string constants
 000810  1  52 45 41 4C  quitaskmessage:      .byte "really quit? y/n",0
@@ -278,1760 +278,1813 @@ Current file: sokoban.asm
 000825  1  43 54 20 41  
 000829  1  20 4C 45 56  
 000834  1  29 3A 20 00  selectendmessage: .byte "): ",0
-000838  1  50 52 45 53  quitmessage:      .byte "press q to quit",0
-00083C  1  53 20 51 20  
-000840  1  54 4F 20 51  
-000848  1  4C 45 56 45  winstatement:     .byte "level complete! new level? y/n",0
-00084C  1  4C 20 43 4F  
-000850  1  4D 50 4C 45  
-000867  1  28 43 29 32  help0:            .byte "(c)2021 venom",0
-00086B  1  30 32 31 20  
-00086F  1  56 45 4E 4F  
-000875  1  4B 45 59 42  help1:            .byte "keyboard shortcuts:",0
-000879  1  4F 41 52 44  
-00087D  1  20 53 48 4F  
-000889  1  43 55 52 53  help2:            .byte "cursor - moves player",0
-00088D  1  4F 52 20 2D  
-000891  1  20 4D 4F 56  
-00089F  1  20 20 20 20  help3:            .byte "     q - quit",0
-0008A3  1  20 51 20 2D  
-0008A7  1  20 51 55 49  
-0008AD  1  20 20 20 20  help4:            .byte "     u - undo",0
-0008B1  1  20 55 20 2D  
-0008B5  1  20 55 4E 44  
-0008BB  1               
-0008BB  1               ; variables that the program uses during execution
-0008BB  1  00           currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
-0008BC  1  00           no_levels:      .byte 0 ; will be read by initfield
-0008BD  1  00           no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
-0008BE  1  00           no_goalsreached:.byte 0 ; static now, reset for each game
-0008BF  1  00           fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
-0008C0  1  00           fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
-0008C1  1  00           vera_byte_low:  .byte 0
-0008C2  1  00           vera_byte_mid:  .byte 0
-0008C3  1  00 00 00 00  undostack:      .byte 0,0,0,0,0,0,0,0,0,0
-0008C7  1  00 00 00 00  
-0008CB  1  00 00        
-0008CD  1  00           undoindex:      .byte 0
-0008CE  1  00           undocounter:    .byte 0
-0008CF  1               
-0008CF  1               ; usage of zeropage address space:
-0008CF  1               ; ZP_PTR_1 - temporary pointer
-0008CF  1               ; ZP_PTR_2 - temporary pointer
-0008CF  1               ; ZP_PTR_3 - position of player
-0008CF  1               ZP_PTR_FIELD = $28
-0008CF  1               temp = $30  ; used for temp 8/16 bit storage $30/$31
-0008CF  1               ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
-0008CF  1               
-0008CF  1               start:
-0008CF  1                   ; force uppercase
-0008CF  1  A9 8E            lda #UPPERCASE
-0008D1  1  20 D2 FF         jsr CHROUT
-0008D4  1               
-0008D4  1  20 07 0D         jsr resetvars
-0008D7  1  20 04 0F         jsr loadtiles       ; load tiles from normal memory to VRAM
-0008DA  1  20 8F 10         jsr layerconfig     ; configure layer 0/1 on screen
-0008DD  1  20 56 10         jsr cleartiles
-0008E0  1               
-0008E0  1  20 57 0F         jsr displaytitlescreen
-0008E3  1  20 94 0C         jsr selectlevel
-0008E6  1  20 56 10         jsr cleartiles      ; cls tiles
-0008E9  1               
-0008E9  1  20 D2 0D         jsr initfield       ; load correct startup values for selected field
-0008EC  1  20 00 11         jsr printfield2
-0008EF  1               
-0008EF  1               keyloop:
-0008EF  1  20 E4 FF         jsr GETIN
-0008F2  1               @checkdown:
-0008F2  1  C9 11            cmp #$11
-0008F4  1  D0 05            bne @checkup
-0008F6  1  20 BE 0A         jsr handledown
-0008F9  1  80 3C            bra @done
-0008FB  1               @checkup:
-0008FB  1  C9 91            cmp #$91
-0008FD  1  D0 05            bne @checkleft
-0008FF  1  20 58 0A         jsr handleup
-000902  1  80 33            bra @done
-000904  1               @checkleft:
-000904  1  C9 9D            cmp #$9d
-000906  1  D0 05            bne @checkright
-000908  1  20 FF 09         jsr handleleft
-00090B  1  80 2A            bra @done
-00090D  1               @checkright:
-00090D  1  C9 1D            cmp #$1d
-00090F  1  D0 05            bne @checkundo
-000911  1  20 A6 09         jsr handleright
-000914  1  80 21            bra @done
-000916  1               @checkundo:
-000916  1  C9 55            cmp #$55 ; 'u'
-000918  1  D0 05            bne @checkquit
-00091A  1  20 4A 09         jsr handle_undocommand
-00091D  1  80 18            bra @done
-00091F  1               @checkquit:
-00091F  1  C9 51            cmp #$51 ; 'q'
-000921  1  D0 14            bne @done
-000923  1  20 8C 09         jsr askquit
-000926  1  B0 0B            bcs @exit
-000928  1  20 FE 0E         jsr cls
-00092B  1  20 56 10         jsr cleartiles
-00092E  1  20 00 11         jsr printfield2
-000931  1  80 04            bra @done
-000933  1               @exit:
-000933  1  20 83 10         jsr resetlayerconfig
-000936  1  60               rts
-000937  1               @done:
-000937  1                   ; check if we have reached all goals
-000937  1  AD BD 08         lda no_goals
-00093A  1  CD BE 08         cmp no_goalsreached
-00093D  1  D0 08            bne @donenextkey
-00093F  1  20 72 09         jsr asknewlevel
-000942  1  B0 EF            bcs @exit
-000944  1  4C CF 08         jmp start   ; reset game / let user decide on new level
-000947  1               @donenextkey:
-000947  1  4C EF 08         jmp keyloop
-00094A  1               
-00094A  1               handle_undocommand:
-00094A  1  20 8F 0B         jsr pull_undostack
-00094D  1                   ; x now contains previous move
-00094D  1                   ;   as #%000MUDRL - Multiple move / Up / Down / Right / Left
-00094D  1                   ; we will give x to the handle_undo_**** routine, so it can see the combined bit (4) and act on it
-00094D  1               @checkup:
-00094D  1  8A               txa
-00094E  1  29 08            and #%00001000
-000950  1  F0 04            beq @checkdown
-000952  1  20 83 0A         jsr handle_undo_up
-000955  1  60               rts
-000956  1               @checkdown:
-000956  1  8A               txa
-000957  1  29 04            and #%00000100
-000959  1  F0 04            beq @checkright
-00095B  1  20 E9 0A         jsr handle_undo_down
-00095E  1  60               rts
-00095F  1               @checkright:
-00095F  1  8A               txa
-000960  1  29 02            and #%00000010
-000962  1  F0 04            beq @checkleft
-000964  1  20 C6 09         jsr handle_undo_right
-000967  1  60               rts
-000968  1               @checkleft:
-000968  1  8A               txa
-000969  1  29 01            and #%00000001
-00096B  1  F0 04            beq @emptystack
-00096D  1  20 1F 0A         jsr handle_undo_left
-000970  1  60               rts
-000971  1               @emptystack:
-000971  1                   ; do nothing
-000971  1  60               rts
-000972  1               
-000972  1               asknewlevel:
-000972  1                   ; ask if the user would like to play a new level, and return clear carry on 'y'
-000972  1  A9 48            lda #<winstatement
-000974  1  85 00            sta ZP_PTR_1
-000976  1  A9 08            lda #>winstatement
-000978  1  85 01            sta ZP_PTR_1+1
-00097A  1  20 66 0F         jsr displaymessagescreen
-00097D  1               
-00097D  1               @keyloop:
-00097D  1  20 E4 FF         jsr GETIN
-000980  1               @checkyes:
-000980  1  C9 59            cmp #$59 ; Y
-000982  1  D0 02            bne @checkno
-000984  1  18               clc
-000985  1  60               rts
-000986  1               @checkno:
-000986  1  C9 4E            cmp #$4e ; N
-000988  1  D0 F3            bne @keyloop
-00098A  1  38               sec
-00098B  1  60               rts
-00098C  1               
-00098C  1               askquit:
-00098C  1                   ; ask if the user would like to quit, and return carry on 'y'
-00098C  1  A9 10            lda #<quitaskmessage
-00098E  1  85 00            sta ZP_PTR_1
-000990  1  A9 08            lda #>quitaskmessage
-000992  1  85 01            sta ZP_PTR_1+1
-000994  1  20 66 0F         jsr displaymessagescreen
-000997  1               
-000997  1               @keyloop:
-000997  1  20 E4 FF         jsr GETIN
-00099A  1               @checkyes:
-00099A  1  C9 59            cmp #$59 ; Y
-00099C  1  D0 02            bne @checkno
-00099E  1  38               sec
-00099F  1  60               rts
-0009A0  1               @checkno:
-0009A0  1  C9 4E            cmp #$4e ; N
-0009A2  1  D0 F3            bne @keyloop
-0009A4  1  18               clc
-0009A5  1  60               rts
-0009A6  1               
-0009A6  1               handleright:
-0009A6  1                   ; pointers
-0009A6  1                   ; 3 - player
-0009A6  1                   ; 2 - block to the right of the player
-0009A6  1                   ; 1 - block to the right of that block
-0009A6  1               
-0009A6  1                   ; ZP_PTR_2 = ZP_PTR_3 + 1x position
-0009A6  1  18               clc
-0009A7  1  A5 24            lda ZP_PTR_3
-0009A9  1  69 01            adc #$1               ; 1x position
-0009AB  1  85 22            sta ZP_PTR_2
-0009AD  1  A5 25            lda ZP_PTR_3+1
-0009AF  1  69 00            adc #$0
-0009B1  1  85 23            sta ZP_PTR_2+1
-0009B3  1               
-0009B3  1                   ; ZP_PTR_1 = ZP_PTR_1 + 2x position
-0009B3  1  18               clc
-0009B4  1  A5 24            lda ZP_PTR_3
-0009B6  1  69 02            adc #$2               ; 2x position
-0009B8  1  85 00            sta ZP_PTR_1
-0009BA  1  A5 25            lda ZP_PTR_3+1
-0009BC  1  69 00            adc #$0
-0009BE  1  85 01            sta ZP_PTR_1+1
-0009C0  1               
-0009C0  1  A2 02            ldx #%00000010 ; right direction
-0009C2  1  20 24 0B         jsr handlemove
-0009C5  1  60               rts
-0009C6  1               
-0009C6  1               handle_undo_right:
-0009C6  1                   ; 3 - player
-0009C6  1               
-0009C6  1  DA               phx ; store x to stack
-0009C7  1                   ; point 1 to player
-0009C7  1               
-0009C7  1  A5 24            lda ZP_PTR_3
-0009C9  1  85 00            sta ZP_PTR_1
-0009CB  1  A5 25            lda ZP_PTR_3+1
-0009CD  1  85 01            sta ZP_PTR_1+1
-0009CF  1               
-0009CF  1                   ; pointer 2 will point to the left of the player
-0009CF  1                   ; so the player will move back to the left
-0009CF  1  38               sec
-0009D0  1  A5 24            lda ZP_PTR_3
-0009D2  1  E9 01            sbc #$1
-0009D4  1  85 22            sta ZP_PTR_2
-0009D6  1  A5 25            lda ZP_PTR_3+1
-0009D8  1  E9 00            sbc #$0
-0009DA  1  85 23            sta ZP_PTR_2+1
-0009DC  1               
-0009DC  1  20 F7 0B         jsr moveplayeronfield
-0009DF  1  20 AD 0B         jsr moveplayerposition
-0009E2  1               
-0009E2  1                   ; check crate move, and if so, move it using pointer 2 -> 1
-0009E2  1  FA               plx
-0009E3  1  8A               txa
-0009E4  1  29 10            and #%00010000 ; was a crate moved in this move?
-0009E6  1  F0 10            beq @done
-0009E8  1               
-0009E8  1                   ; load pointer 2 to the right of the previous player's position
-0009E8  1  18               clc
-0009E9  1  A5 00            lda ZP_PTR_1
-0009EB  1  69 01            adc #$1
-0009ED  1  85 22            sta ZP_PTR_2
-0009EF  1  A5 01            lda ZP_PTR_1+1
-0009F1  1  69 00            adc #$0
-0009F3  1  85 23            sta ZP_PTR_2+1
-0009F5  1               
-0009F5  1  20 B6 0B         jsr movecrateonfield
-0009F8  1               @done:
-0009F8  1  20 FE 0E         jsr cls
-0009FB  1  20 00 11         jsr printfield2
-0009FE  1  60               rts
-0009FF  1               
-0009FF  1               handleleft:
-0009FF  1                   ; pointers
-0009FF  1                   ; 3 - player
-0009FF  1                   ; 2 - block to the left of the player
-0009FF  1                   ; 1 - block to the left of that block
-0009FF  1               
-0009FF  1                   ; ZP_PTR_2 = ZP_PTR_3 - 1x position
-0009FF  1  38               sec
-000A00  1  A5 24            lda ZP_PTR_3
-000A02  1  E9 01            sbc #$1               ; 1x position
-000A04  1  85 22            sta ZP_PTR_2
-000A06  1  A5 25            lda ZP_PTR_3+1
-000A08  1  E9 00            sbc #$0
-000A0A  1  85 23            sta ZP_PTR_2+1
-000A0C  1               
-000A0C  1                   ; ZP_PTR_1 = ZP_PTR_1 - 2x position
-000A0C  1  38               sec
-000A0D  1  A5 24            lda ZP_PTR_3
-000A0F  1  E9 02            sbc #$2               ; 2x position
-000A11  1  85 00            sta ZP_PTR_1
-000A13  1  A5 25            lda ZP_PTR_3+1
-000A15  1  E9 00            sbc #$0
-000A17  1  85 01            sta ZP_PTR_1+1
-000A19  1               
-000A19  1  A2 01            ldx #%00000001 ; left direction
-000A1B  1  20 24 0B         jsr handlemove
-000A1E  1               
-000A1E  1               @done:
-000A1E  1  60               rts
-000A1F  1               
-000A1F  1               handle_undo_left:
-000A1F  1                   ; 3 - player
-000A1F  1               
-000A1F  1  DA               phx ; store x to stack
-000A20  1               
-000A20  1                   ; point 1 to player
-000A20  1  A5 24            lda ZP_PTR_3
-000A22  1  85 00            sta ZP_PTR_1
-000A24  1  A5 25            lda ZP_PTR_3+1
-000A26  1  85 01            sta ZP_PTR_1+1
-000A28  1               
-000A28  1                   ; pointer 2 will point to the right of the player
-000A28  1                   ; so the player will move back to the right
-000A28  1  18               clc
-000A29  1  A5 24            lda ZP_PTR_3
-000A2B  1  69 01            adc #$1
-000A2D  1  85 22            sta ZP_PTR_2
-000A2F  1  A5 25            lda ZP_PTR_3+1
-000A31  1  69 00            adc #$0
-000A33  1  85 23            sta ZP_PTR_2+1
-000A35  1               
-000A35  1  20 F7 0B         jsr moveplayeronfield
-000A38  1  20 AD 0B         jsr moveplayerposition
+000838  1  52 45 41 4C  resetmessage:     .byte "really reset level? y/n",0
+00083C  1  4C 59 20 52  
+000840  1  45 53 45 54  
+000850  1  50 52 45 53  quitmessage:      .byte "press q to quit",0
+000854  1  53 20 51 20  
+000858  1  54 4F 20 51  
+000860  1  4C 45 56 45  winstatement:     .byte "level complete! new level? y/n",0
+000864  1  4C 20 43 4F  
+000868  1  4D 50 4C 45  
+00087F  1  28 43 29 32  help0:            .byte "(c)2021 venom",0
+000883  1  30 32 31 20  
+000887  1  56 45 4E 4F  
+00088D  1  4B 45 59 42  help1:            .byte "keyboard shortcuts:",0
+000891  1  4F 41 52 44  
+000895  1  20 53 48 4F  
+0008A1  1  43 55 52 53  help2:            .byte "cursor - moves player",0
+0008A5  1  4F 52 20 2D  
+0008A9  1  20 4D 4F 56  
+0008B7  1  20 20 20 20  help3:            .byte "     q - quit",0
+0008BB  1  20 51 20 2D  
+0008BF  1  20 51 55 49  
+0008C5  1  20 20 20 20  help4:            .byte "     u - undo move(s)",0
+0008C9  1  20 55 20 2D  
+0008CD  1  20 55 4E 44  
+0008DB  1  20 20 20 20  help5:            .byte "     r - reset level",0
+0008DF  1  20 52 20 2D  
+0008E3  1  20 52 45 53  
+0008F0  1               
+0008F0  1               ; variables that the program uses during execution
+0008F0  1  00           currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+0008F1  1  00           no_levels:      .byte 0 ; will be read by initfield
+0008F2  1  00           no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
+0008F3  1  00           no_goalsreached:.byte 0 ; static now, reset for each game
+0008F4  1  00           fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
+0008F5  1  00           fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
+0008F6  1  00           vera_byte_low:  .byte 0
+0008F7  1  00           vera_byte_mid:  .byte 0
+0008F8  1  00 00 00 00  undostack:      .byte 0,0,0,0,0,0,0,0,0,0
+0008FC  1  00 00 00 00  
+000900  1  00 00        
+000902  1  00           undoindex:      .byte 0
+000903  1  00           undocounter:    .byte 0
+000904  1               
+000904  1               ; usage of zeropage address space:
+000904  1               ; ZP_PTR_1 - temporary pointer
+000904  1               ; ZP_PTR_2 - temporary pointer
+000904  1               ; ZP_PTR_3 - position of player
+000904  1               ZP_PTR_FIELD = $28
+000904  1               temp = $30  ; used for temp 8/16 bit storage $30/$31
+000904  1               ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
+000904  1               
+000904  1               start:
+000904  1                   ; force uppercase
+000904  1  A9 8E            lda #UPPERCASE
+000906  1  20 D2 FF         jsr CHROUT
+000909  1               
+000909  1  20 78 0F         jsr loadtiles       ; load tiles from normal memory to VRAM
+00090C  1  20 18 11         jsr layerconfig     ; configure layer 0/1 on screen
+00090F  1               
+00090F  1  20 7B 0D         jsr resetvars
+000912  1  20 DF 10         jsr cleartiles
+000915  1               
+000915  1  20 CB 0F         jsr displaytitlescreen
+000918  1  20 08 0D         jsr selectlevel
+00091B  1  20 DF 10         jsr cleartiles      ; cls tiles
+00091E  1               
+00091E  1  20 46 0E         jsr initfield       ; load correct startup values for selected field
+000921  1  20 89 11         jsr printfield2
+000924  1               
+000924  1               keyloop:
+000924  1  20 E4 FF         jsr GETIN
+000927  1               @checkdown:
+000927  1  C9 11            cmp #$11
+000929  1  D0 05            bne @checkup
+00092B  1  20 32 0B         jsr handledown
+00092E  1  80 61            bra @done
+000930  1               @checkup:
+000930  1  C9 91            cmp #$91
+000932  1  D0 05            bne @checkleft
+000934  1  20 CC 0A         jsr handleup
+000937  1  80 58            bra @done
+000939  1               @checkleft:
+000939  1  C9 9D            cmp #$9d
+00093B  1  D0 05            bne @checkright
+00093D  1  20 73 0A         jsr handleleft
+000940  1  80 4F            bra @done
+000942  1               @checkright:
+000942  1  C9 1D            cmp #$1d
+000944  1  D0 05            bne @checkundo
+000946  1  20 1A 0A         jsr handleright
+000949  1  80 46            bra @done
+00094B  1               @checkundo:
+00094B  1  C9 55            cmp #$55 ; 'u'
+00094D  1  D0 05            bne @checkreset
+00094F  1  20 A4 09         jsr handle_undocommand
+000952  1  80 3D            bra @done
+000954  1               @checkreset:
+000954  1  C9 52            cmp #$52 ; 'r'
+000956  1  D0 21            bne @checkquit
+000958  1  20 00 0A         jsr askreset
+00095B  1  B0 0B            bcs @resetgame
+00095D  1  20 72 0F         jsr cls
+000960  1  20 DF 10         jsr cleartiles
+000963  1  20 89 11         jsr printfield2
+000966  1  80 29            bra @done
+000968  1               @resetgame:
+000968  1  20 72 0F         jsr cls
+00096B  1  20 DF 10         jsr cleartiles
+00096E  1  20 7B 0D         jsr resetvars
+000971  1  20 46 0E         jsr initfield
+000974  1  20 89 11         jsr printfield2
+000977  1  80 AB            bra keyloop
+000979  1               @checkquit:
+000979  1  C9 51            cmp #$51 ; 'q'
+00097B  1  D0 14            bne @done
+00097D  1  20 E6 09         jsr askquit
+000980  1  B0 0B            bcs @exit
+000982  1  20 72 0F         jsr cls
+000985  1  20 DF 10         jsr cleartiles
+000988  1  20 89 11         jsr printfield2
+00098B  1  80 04            bra @done
+00098D  1               @exit:
+00098D  1  20 0C 11         jsr resetlayerconfig
+000990  1  60               rts
+000991  1               @done:
+000991  1                   ; check if we have reached all goals
+000991  1  AD F2 08         lda no_goals
+000994  1  CD F3 08         cmp no_goalsreached
+000997  1  D0 08            bne @donenextkey
+000999  1  20 CC 09         jsr asknewlevel
+00099C  1  B0 EF            bcs @exit
+00099E  1  4C 04 09         jmp start   ; reset game / let user decide on new level
+0009A1  1               @donenextkey:
+0009A1  1  4C 24 09         jmp keyloop
+0009A4  1               
+0009A4  1               handle_undocommand:
+0009A4  1  20 03 0C         jsr pull_undostack
+0009A7  1                   ; x now contains previous move
+0009A7  1                   ;   as #%000MUDRL - Multiple move / Up / Down / Right / Left
+0009A7  1                   ; we will give x to the handle_undo_**** routine, so it can see the combined bit (4) and act on it
+0009A7  1               @checkup:
+0009A7  1  8A               txa
+0009A8  1  29 08            and #%00001000
+0009AA  1  F0 04            beq @checkdown
+0009AC  1  20 F7 0A         jsr handle_undo_up
+0009AF  1  60               rts
+0009B0  1               @checkdown:
+0009B0  1  8A               txa
+0009B1  1  29 04            and #%00000100
+0009B3  1  F0 04            beq @checkright
+0009B5  1  20 5D 0B         jsr handle_undo_down
+0009B8  1  60               rts
+0009B9  1               @checkright:
+0009B9  1  8A               txa
+0009BA  1  29 02            and #%00000010
+0009BC  1  F0 04            beq @checkleft
+0009BE  1  20 3A 0A         jsr handle_undo_right
+0009C1  1  60               rts
+0009C2  1               @checkleft:
+0009C2  1  8A               txa
+0009C3  1  29 01            and #%00000001
+0009C5  1  F0 04            beq @emptystack
+0009C7  1  20 93 0A         jsr handle_undo_left
+0009CA  1  60               rts
+0009CB  1               @emptystack:
+0009CB  1                   ; do nothing
+0009CB  1  60               rts
+0009CC  1               
+0009CC  1               asknewlevel:
+0009CC  1                   ; ask if the user would like to play a new level, and return clear carry on 'y'
+0009CC  1  A9 60            lda #<winstatement
+0009CE  1  85 00            sta ZP_PTR_1
+0009D0  1  A9 08            lda #>winstatement
+0009D2  1  85 01            sta ZP_PTR_1+1
+0009D4  1  20 DA 0F         jsr displaymessagescreen
+0009D7  1               
+0009D7  1               @keyloop:
+0009D7  1  20 E4 FF         jsr GETIN
+0009DA  1               @checkyes:
+0009DA  1  C9 59            cmp #$59 ; Y
+0009DC  1  D0 02            bne @checkno
+0009DE  1  18               clc
+0009DF  1  60               rts
+0009E0  1               @checkno:
+0009E0  1  C9 4E            cmp #$4e ; N
+0009E2  1  D0 F3            bne @keyloop
+0009E4  1  38               sec
+0009E5  1  60               rts
+0009E6  1               
+0009E6  1               askquit:
+0009E6  1                   ; ask if the user would like to quit, and return carry on 'y'
+0009E6  1  A9 10            lda #<quitaskmessage
+0009E8  1  85 00            sta ZP_PTR_1
+0009EA  1  A9 08            lda #>quitaskmessage
+0009EC  1  85 01            sta ZP_PTR_1+1
+0009EE  1  20 DA 0F         jsr displaymessagescreen
+0009F1  1               
+0009F1  1               @keyloop:
+0009F1  1  20 E4 FF         jsr GETIN
+0009F4  1               @checkyes:
+0009F4  1  C9 59            cmp #$59 ; Y
+0009F6  1  D0 02            bne @checkno
+0009F8  1  38               sec
+0009F9  1  60               rts
+0009FA  1               @checkno:
+0009FA  1  C9 4E            cmp #$4e ; N
+0009FC  1  D0 F3            bne @keyloop
+0009FE  1  18               clc
+0009FF  1  60               rts
+000A00  1               
+000A00  1               askreset:
+000A00  1                   ; ask if the user would like to reset, and return carry on 'y'
+000A00  1  A9 38            lda #<resetmessage
+000A02  1  85 00            sta ZP_PTR_1
+000A04  1  A9 08            lda #>resetmessage
+000A06  1  85 01            sta ZP_PTR_1+1
+000A08  1  20 DA 0F         jsr displaymessagescreen
+000A0B  1               
+000A0B  1               @keyloop:
+000A0B  1  20 E4 FF         jsr GETIN
+000A0E  1               @checkyes:
+000A0E  1  C9 59            cmp #$59 ; Y
+000A10  1  D0 02            bne @checkno
+000A12  1  38               sec
+000A13  1  60               rts
+000A14  1               @checkno:
+000A14  1  C9 4E            cmp #$4e ; N
+000A16  1  D0 F3            bne @keyloop
+000A18  1  18               clc
+000A19  1  60               rts
+000A1A  1               
+000A1A  1               handleright:
+000A1A  1                   ; pointers
+000A1A  1                   ; 3 - player
+000A1A  1                   ; 2 - block to the right of the player
+000A1A  1                   ; 1 - block to the right of that block
+000A1A  1               
+000A1A  1                   ; ZP_PTR_2 = ZP_PTR_3 + 1x position
+000A1A  1  18               clc
+000A1B  1  A5 24            lda ZP_PTR_3
+000A1D  1  69 01            adc #$1               ; 1x position
+000A1F  1  85 22            sta ZP_PTR_2
+000A21  1  A5 25            lda ZP_PTR_3+1
+000A23  1  69 00            adc #$0
+000A25  1  85 23            sta ZP_PTR_2+1
+000A27  1               
+000A27  1                   ; ZP_PTR_1 = ZP_PTR_1 + 2x position
+000A27  1  18               clc
+000A28  1  A5 24            lda ZP_PTR_3
+000A2A  1  69 02            adc #$2               ; 2x position
+000A2C  1  85 00            sta ZP_PTR_1
+000A2E  1  A5 25            lda ZP_PTR_3+1
+000A30  1  69 00            adc #$0
+000A32  1  85 01            sta ZP_PTR_1+1
+000A34  1               
+000A34  1  A2 02            ldx #%00000010 ; right direction
+000A36  1  20 98 0B         jsr handlemove
+000A39  1  60               rts
+000A3A  1               
+000A3A  1               handle_undo_right:
+000A3A  1                   ; 3 - player
+000A3A  1               
+000A3A  1  DA               phx ; store x to stack
+000A3B  1                   ; point 1 to player
 000A3B  1               
-000A3B  1                   ; check crate move, and if so, move it using pointer 2 -> 1
-000A3B  1  FA               plx
-000A3C  1  8A               txa
-000A3D  1  29 10            and #%00010000 ; was a crate moved in this move?
-000A3F  1  F0 10            beq @done
-000A41  1               
-000A41  1                   ; load pointer 2 to the left of the previous player's position
-000A41  1  38               sec
-000A42  1  A5 00            lda ZP_PTR_1
-000A44  1  E9 01            sbc #$1
-000A46  1  85 22            sta ZP_PTR_2
-000A48  1  A5 01            lda ZP_PTR_1+1
-000A4A  1  E9 00            sbc #$0
-000A4C  1  85 23            sta ZP_PTR_2+1
-000A4E  1               
-000A4E  1  20 B6 0B         jsr movecrateonfield
-000A51  1               @done:
-000A51  1  20 FE 0E         jsr cls
-000A54  1  20 00 11         jsr printfield2
-000A57  1  60               rts
-000A58  1               
-000A58  1               handleup:
-000A58  1                   ; pointers
-000A58  1                   ; 3 - player
-000A58  1                   ; 2 - block to the top of the player
-000A58  1                   ; 1 - block to the top of that block
-000A58  1               
-000A58  1                   ; ZP_PTR_2 = ZP_PTR_3 - 1xFIELDWIDTH
-000A58  1  AD BF 08         lda fieldwidth
-000A5B  1  85 30            sta temp
-000A5D  1  38               sec
-000A5E  1  A5 24            lda ZP_PTR_3
-000A60  1  E5 30            sbc temp
-000A62  1  85 22            sta ZP_PTR_2
-000A64  1  A5 25            lda ZP_PTR_3+1
-000A66  1  E9 00            sbc #$0
-000A68  1  85 23            sta ZP_PTR_2+1
-000A6A  1               
-000A6A  1                   ; ZP_PTR_1 = ZP_PTR_1 - 2xFIELDWIDTH
-000A6A  1  AD BF 08         lda fieldwidth
-000A6D  1  0A               asl ; 2x
-000A6E  1  85 30            sta temp
-000A70  1  38               sec
-000A71  1  A5 24            lda ZP_PTR_3
-000A73  1  E5 30            sbc temp
-000A75  1  85 00            sta ZP_PTR_1
-000A77  1  A5 25            lda ZP_PTR_3+1
-000A79  1  E9 00            sbc #$0
-000A7B  1  85 01            sta ZP_PTR_1+1
-000A7D  1               
-000A7D  1  A2 08            ldx #%00001000 ; up direction
-000A7F  1  20 24 0B         jsr handlemove
-000A82  1               
-000A82  1  60               rts
-000A83  1               
-000A83  1               handle_undo_up:
-000A83  1                   ; 3 - player
-000A83  1               
-000A83  1  DA               phx ; store x to stack
-000A84  1               
-000A84  1                   ; point 1 to player
-000A84  1  A5 24            lda ZP_PTR_3
-000A86  1  85 00            sta ZP_PTR_1
-000A88  1  A5 25            lda ZP_PTR_3+1
-000A8A  1  85 01            sta ZP_PTR_1+1
-000A8C  1               
-000A8C  1                   ; pointer 2 will point to the position down of the player
-000A8C  1                   ; so the player will move back down
-000A8C  1  18               clc
-000A8D  1  A5 24            lda ZP_PTR_3
-000A8F  1  6D BF 08         adc fieldwidth
-000A92  1  85 22            sta ZP_PTR_2
-000A94  1  A5 25            lda ZP_PTR_3+1
-000A96  1  69 00            adc #$0
-000A98  1  85 23            sta ZP_PTR_2+1
-000A9A  1               
-000A9A  1  20 F7 0B         jsr moveplayeronfield
-000A9D  1  20 AD 0B         jsr moveplayerposition
-000AA0  1               
-000AA0  1                   ; check crate move, and if so, move it using pointer 2 -> 1
-000AA0  1  FA               plx
-000AA1  1  8A               txa
-000AA2  1  29 10            and #%00010000 ; was a crate moved in this move?
-000AA4  1  F0 11            beq @done
-000AA6  1               
-000AA6  1                   ; load pointer 2 to the top of the previous player's position
-000AA6  1  38               sec
-000AA7  1  A5 00            lda ZP_PTR_1
-000AA9  1  ED BF 08         sbc fieldwidth
-000AAC  1  85 22            sta ZP_PTR_2
-000AAE  1  A5 01            lda ZP_PTR_1+1
-000AB0  1  E9 00            sbc #$0
-000AB2  1  85 23            sta ZP_PTR_2+1
-000AB4  1               
-000AB4  1  20 B6 0B         jsr movecrateonfield
-000AB7  1               @done:
-000AB7  1  20 FE 0E         jsr cls
-000ABA  1  20 00 11         jsr printfield2
-000ABD  1  60               rts
-000ABE  1               
-000ABE  1               handledown:
-000ABE  1                   ; pointers
-000ABE  1                   ; 3 - player
-000ABE  1                   ; 2 - block to the bottom of the player
-000ABE  1                   ; 1 - block to the bottom of that block
-000ABE  1               
-000ABE  1                   ; ZP_PTR_2 = ZP_PTR_3 + 1xFIELDWIDTH
-000ABE  1  AD BF 08         lda fieldwidth
-000AC1  1  85 30            sta temp
-000AC3  1  18               clc
-000AC4  1  A5 24            lda ZP_PTR_3
-000AC6  1  65 30            adc temp
-000AC8  1  85 22            sta ZP_PTR_2
-000ACA  1  A5 25            lda ZP_PTR_3+1
-000ACC  1  69 00            adc #$0
-000ACE  1  85 23            sta ZP_PTR_2+1
-000AD0  1               
-000AD0  1                   ; ZP_PTR_1 = ZP_PTR_1 + 2xFIELDWIDTH
-000AD0  1  AD BF 08         lda fieldwidth
-000AD3  1  0A               asl ; 2x
-000AD4  1  85 30            sta temp
-000AD6  1  18               clc
-000AD7  1  A5 24            lda ZP_PTR_3
-000AD9  1  65 30            adc temp
-000ADB  1  85 00            sta ZP_PTR_1
-000ADD  1  A5 25            lda ZP_PTR_3+1
-000ADF  1  69 00            adc #$0
-000AE1  1  85 01            sta ZP_PTR_1+1
-000AE3  1               
-000AE3  1  A2 04            ldx #%00000100 ; down direction
-000AE5  1  20 24 0B         jsr handlemove
-000AE8  1               
-000AE8  1  60               rts
-000AE9  1               
-000AE9  1               handle_undo_down:
-000AE9  1                   ; 3 - player
-000AE9  1               
-000AE9  1  DA               phx ; store x to stack
-000AEA  1               
-000AEA  1                   ; point 1 to player
-000AEA  1  A5 24            lda ZP_PTR_3
-000AEC  1  85 00            sta ZP_PTR_1
-000AEE  1  A5 25            lda ZP_PTR_3+1
-000AF0  1  85 01            sta ZP_PTR_1+1
-000AF2  1               
-000AF2  1                   ; pointer 2 will point to the position up of the player
-000AF2  1                   ; so the player will move back up
-000AF2  1  38               sec
-000AF3  1  A5 24            lda ZP_PTR_3
-000AF5  1  ED BF 08         sbc fieldwidth
-000AF8  1  85 22            sta ZP_PTR_2
-000AFA  1  A5 25            lda ZP_PTR_3+1
-000AFC  1  E9 00            sbc #$0
-000AFE  1  85 23            sta ZP_PTR_2+1
+000A3B  1  A5 24            lda ZP_PTR_3
+000A3D  1  85 00            sta ZP_PTR_1
+000A3F  1  A5 25            lda ZP_PTR_3+1
+000A41  1  85 01            sta ZP_PTR_1+1
+000A43  1               
+000A43  1                   ; pointer 2 will point to the left of the player
+000A43  1                   ; so the player will move back to the left
+000A43  1  38               sec
+000A44  1  A5 24            lda ZP_PTR_3
+000A46  1  E9 01            sbc #$1
+000A48  1  85 22            sta ZP_PTR_2
+000A4A  1  A5 25            lda ZP_PTR_3+1
+000A4C  1  E9 00            sbc #$0
+000A4E  1  85 23            sta ZP_PTR_2+1
+000A50  1               
+000A50  1  20 6B 0C         jsr moveplayeronfield
+000A53  1  20 21 0C         jsr moveplayerposition
+000A56  1               
+000A56  1                   ; check crate move, and if so, move it using pointer 2 -> 1
+000A56  1  FA               plx
+000A57  1  8A               txa
+000A58  1  29 10            and #%00010000 ; was a crate moved in this move?
+000A5A  1  F0 10            beq @done
+000A5C  1               
+000A5C  1                   ; load pointer 2 to the right of the previous player's position
+000A5C  1  18               clc
+000A5D  1  A5 00            lda ZP_PTR_1
+000A5F  1  69 01            adc #$1
+000A61  1  85 22            sta ZP_PTR_2
+000A63  1  A5 01            lda ZP_PTR_1+1
+000A65  1  69 00            adc #$0
+000A67  1  85 23            sta ZP_PTR_2+1
+000A69  1               
+000A69  1  20 2A 0C         jsr movecrateonfield
+000A6C  1               @done:
+000A6C  1  20 72 0F         jsr cls
+000A6F  1  20 89 11         jsr printfield2
+000A72  1  60               rts
+000A73  1               
+000A73  1               handleleft:
+000A73  1                   ; pointers
+000A73  1                   ; 3 - player
+000A73  1                   ; 2 - block to the left of the player
+000A73  1                   ; 1 - block to the left of that block
+000A73  1               
+000A73  1                   ; ZP_PTR_2 = ZP_PTR_3 - 1x position
+000A73  1  38               sec
+000A74  1  A5 24            lda ZP_PTR_3
+000A76  1  E9 01            sbc #$1               ; 1x position
+000A78  1  85 22            sta ZP_PTR_2
+000A7A  1  A5 25            lda ZP_PTR_3+1
+000A7C  1  E9 00            sbc #$0
+000A7E  1  85 23            sta ZP_PTR_2+1
+000A80  1               
+000A80  1                   ; ZP_PTR_1 = ZP_PTR_1 - 2x position
+000A80  1  38               sec
+000A81  1  A5 24            lda ZP_PTR_3
+000A83  1  E9 02            sbc #$2               ; 2x position
+000A85  1  85 00            sta ZP_PTR_1
+000A87  1  A5 25            lda ZP_PTR_3+1
+000A89  1  E9 00            sbc #$0
+000A8B  1  85 01            sta ZP_PTR_1+1
+000A8D  1               
+000A8D  1  A2 01            ldx #%00000001 ; left direction
+000A8F  1  20 98 0B         jsr handlemove
+000A92  1               
+000A92  1               @done:
+000A92  1  60               rts
+000A93  1               
+000A93  1               handle_undo_left:
+000A93  1                   ; 3 - player
+000A93  1               
+000A93  1  DA               phx ; store x to stack
+000A94  1               
+000A94  1                   ; point 1 to player
+000A94  1  A5 24            lda ZP_PTR_3
+000A96  1  85 00            sta ZP_PTR_1
+000A98  1  A5 25            lda ZP_PTR_3+1
+000A9A  1  85 01            sta ZP_PTR_1+1
+000A9C  1               
+000A9C  1                   ; pointer 2 will point to the right of the player
+000A9C  1                   ; so the player will move back to the right
+000A9C  1  18               clc
+000A9D  1  A5 24            lda ZP_PTR_3
+000A9F  1  69 01            adc #$1
+000AA1  1  85 22            sta ZP_PTR_2
+000AA3  1  A5 25            lda ZP_PTR_3+1
+000AA5  1  69 00            adc #$0
+000AA7  1  85 23            sta ZP_PTR_2+1
+000AA9  1               
+000AA9  1  20 6B 0C         jsr moveplayeronfield
+000AAC  1  20 21 0C         jsr moveplayerposition
+000AAF  1               
+000AAF  1                   ; check crate move, and if so, move it using pointer 2 -> 1
+000AAF  1  FA               plx
+000AB0  1  8A               txa
+000AB1  1  29 10            and #%00010000 ; was a crate moved in this move?
+000AB3  1  F0 10            beq @done
+000AB5  1               
+000AB5  1                   ; load pointer 2 to the left of the previous player's position
+000AB5  1  38               sec
+000AB6  1  A5 00            lda ZP_PTR_1
+000AB8  1  E9 01            sbc #$1
+000ABA  1  85 22            sta ZP_PTR_2
+000ABC  1  A5 01            lda ZP_PTR_1+1
+000ABE  1  E9 00            sbc #$0
+000AC0  1  85 23            sta ZP_PTR_2+1
+000AC2  1               
+000AC2  1  20 2A 0C         jsr movecrateonfield
+000AC5  1               @done:
+000AC5  1  20 72 0F         jsr cls
+000AC8  1  20 89 11         jsr printfield2
+000ACB  1  60               rts
+000ACC  1               
+000ACC  1               handleup:
+000ACC  1                   ; pointers
+000ACC  1                   ; 3 - player
+000ACC  1                   ; 2 - block to the top of the player
+000ACC  1                   ; 1 - block to the top of that block
+000ACC  1               
+000ACC  1                   ; ZP_PTR_2 = ZP_PTR_3 - 1xFIELDWIDTH
+000ACC  1  AD F4 08         lda fieldwidth
+000ACF  1  85 30            sta temp
+000AD1  1  38               sec
+000AD2  1  A5 24            lda ZP_PTR_3
+000AD4  1  E5 30            sbc temp
+000AD6  1  85 22            sta ZP_PTR_2
+000AD8  1  A5 25            lda ZP_PTR_3+1
+000ADA  1  E9 00            sbc #$0
+000ADC  1  85 23            sta ZP_PTR_2+1
+000ADE  1               
+000ADE  1                   ; ZP_PTR_1 = ZP_PTR_1 - 2xFIELDWIDTH
+000ADE  1  AD F4 08         lda fieldwidth
+000AE1  1  0A               asl ; 2x
+000AE2  1  85 30            sta temp
+000AE4  1  38               sec
+000AE5  1  A5 24            lda ZP_PTR_3
+000AE7  1  E5 30            sbc temp
+000AE9  1  85 00            sta ZP_PTR_1
+000AEB  1  A5 25            lda ZP_PTR_3+1
+000AED  1  E9 00            sbc #$0
+000AEF  1  85 01            sta ZP_PTR_1+1
+000AF1  1               
+000AF1  1  A2 08            ldx #%00001000 ; up direction
+000AF3  1  20 98 0B         jsr handlemove
+000AF6  1               
+000AF6  1  60               rts
+000AF7  1               
+000AF7  1               handle_undo_up:
+000AF7  1                   ; 3 - player
+000AF7  1               
+000AF7  1  DA               phx ; store x to stack
+000AF8  1               
+000AF8  1                   ; point 1 to player
+000AF8  1  A5 24            lda ZP_PTR_3
+000AFA  1  85 00            sta ZP_PTR_1
+000AFC  1  A5 25            lda ZP_PTR_3+1
+000AFE  1  85 01            sta ZP_PTR_1+1
 000B00  1               
-000B00  1  20 F7 0B         jsr moveplayeronfield
-000B03  1  20 AD 0B         jsr moveplayerposition
-000B06  1               
-000B06  1                   ; check crate move, and if so, move it using pointer 2 -> 1
-000B06  1  FA               plx
-000B07  1  8A               txa
-000B08  1  29 10            and #%00010000 ; was a crate moved in this move?
-000B0A  1  F0 11            beq @done
-000B0C  1               
-000B0C  1                   ; load pointer 2 to the bottom of the previous player's position
-000B0C  1  18               clc
-000B0D  1  A5 00            lda ZP_PTR_1
-000B0F  1  6D BF 08         adc fieldwidth
-000B12  1  85 22            sta ZP_PTR_2
-000B14  1  A5 01            lda ZP_PTR_1+1
-000B16  1  69 00            adc #$0
-000B18  1  85 23            sta ZP_PTR_2+1
+000B00  1                   ; pointer 2 will point to the position down of the player
+000B00  1                   ; so the player will move back down
+000B00  1  18               clc
+000B01  1  A5 24            lda ZP_PTR_3
+000B03  1  6D F4 08         adc fieldwidth
+000B06  1  85 22            sta ZP_PTR_2
+000B08  1  A5 25            lda ZP_PTR_3+1
+000B0A  1  69 00            adc #$0
+000B0C  1  85 23            sta ZP_PTR_2+1
+000B0E  1               
+000B0E  1  20 6B 0C         jsr moveplayeronfield
+000B11  1  20 21 0C         jsr moveplayerposition
+000B14  1               
+000B14  1                   ; check crate move, and if so, move it using pointer 2 -> 1
+000B14  1  FA               plx
+000B15  1  8A               txa
+000B16  1  29 10            and #%00010000 ; was a crate moved in this move?
+000B18  1  F0 11            beq @done
 000B1A  1               
-000B1A  1  20 B6 0B         jsr movecrateonfield
-000B1D  1               @done:
-000B1D  1  20 FE 0E         jsr cls
-000B20  1  20 00 11         jsr printfield2
-000B23  1  60               rts
-000B24  1               
-000B24  1               handlemove:
-000B24  1                   ; pointers
-000B24  1                   ; 3 - points to the player position
-000B24  1                   ; 2 - points to the next block at the indicated direction
-000B24  1                   ; 1 - points to the block after that block
-000B24  1               
-000B24  1  DA               phx ; push x to stack with stored direction
-000B25  1               
-000B25  1  A0 00            ldy #0
-000B27  1  B1 22            lda (ZP_PTR_2),y
-000B29  1  C9 20            cmp #' ' ; empty block next to player?
-000B2B  1  F0 06            beq @moveplayertopoint2
-000B2D  1  C9 2E            cmp #'.' ; goal position next to player?
-000B2F  1  F0 02            beq @moveplayertopoint2
-000B31  1  80 0C            bra @next ; no ' ' or '.' found next to player, is it a crate or a wall?
-000B33  1               @moveplayertopoint2:
-000B33  1                   ; move player to pointer 2
-000B33  1  20 F7 0B         jsr moveplayeronfield
-000B36  1  20 AD 0B         jsr moveplayerposition
-000B39  1               
-000B39  1  FA               plx ; pull direction from the stack
-000B3A  1  20 72 0B         jsr push_undostack
-000B3D  1  80 2A            bra @movecomplete
-000B3F  1               @next:
-000B3F  1  A0 00            ldy #0
-000B41  1  B1 22            lda (ZP_PTR_2),y
-000B43  1  C9 24            cmp #'$' ; crate next to player?
-000B45  1  F0 06            beq @combinedmovecheck
-000B47  1  C9 2A            cmp #'*' ; crate on goal next to player?
-000B49  1  F0 02            beq @combinedmovecheck
-000B4B  1  80 23            bra @ignore ; something else not able to push
-000B4D  1               @combinedmovecheck:
-000B4D  1  B1 00            lda (ZP_PTR_1),y
-000B4F  1  C9 20            cmp #' ' ; space after crate?
-000B51  1  F0 06            beq @combinedmove
-000B53  1  C9 2E            cmp #'.' ; goal after crate?
-000B55  1  F0 02            beq @combinedmove
-000B57  1  80 17            bra @ignore ; nothing to move
-000B59  1               @combinedmove:
-000B59  1  20 B6 0B         jsr movecrateonfield
-000B5C  1  20 F7 0B         jsr moveplayeronfield
-000B5F  1  20 AD 0B         jsr moveplayerposition
-000B62  1               
-000B62  1                   ; record combined move to undo stack
-000B62  1  68               pla
-000B63  1  09 10            ora #%00010000   ; set 'combined' bit 4
-000B65  1  AA               tax
-000B66  1  20 72 0B         jsr push_undostack
-000B69  1               
-000B69  1               @movecomplete:
-000B69  1  20 00 11         jsr printfield2
-000B6C  1  20 FE 0E         jsr cls
-000B6F  1  60               rts
-000B70  1               
-000B70  1               @ignore: ; nothing to move
-000B70  1  FA               plx  ; don't forget to remove the stacked x move
-000B71  1  60               rts
-000B72  1               
-000B72  1               push_undostack:
-000B72  1                   ; record single move to undo stack
-000B72  1                   ; x contains direction and single/multiple move
-000B72  1                   ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
-000B72  1                   ;
-000B72  1                   ; the stack index 'pointer' undoindex points to a new entry each time
-000B72  1  8A               txa
-000B73  1  AC CD 08         ldy undoindex
-000B76  1  91 32            sta (ZP_PTR_UNDO),y
-000B78  1               
-000B78  1  C0 09            cpy #MAXUNDO-1 ; at last physical item in memory? then loop around
-000B7A  1  F0 05            beq @loopindex
-000B7C  1  EE CD 08         inc undoindex
-000B7F  1  80 03            bra @checkmaxcount
-000B81  1                @loopindex:
-000B81  1  9C CD 08         stz undoindex
-000B84  1                @checkmaxcount:
-000B84  1  AD CE 08         lda undocounter
-000B87  1  C9 0A            cmp #MAXUNDO
-000B89  1  F0 03            beq @done ; maximum count reached / stack will loop around
-000B8B  1  EE CE 08         inc undocounter
-000B8E  1                @done:
-000B8E  1  60               rts
-000B8F  1               
-000B8F  1               pull_undostack:
-000B8F  1                   ; remove single move from undo stack
-000B8F  1                   ; afterwards, x contains direction and single/multiple move
-000B8F  1                   ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
-000B8F  1               
-000B8F  1  AD CE 08         lda undocounter ; check if we have any moves pushed to the stack
-000B92  1  D0 03            bne @stackedmoves
-000B94  1  A2 00            ldx #$0 ; empty move, nothing in the stack
-000B96  1  60               rts
-000B97  1               
-000B97  1               @stackedmoves:
-000B97  1  CE CE 08         dec undocounter ; reduce the number pushed to the stack with 1
-000B9A  1  AC CD 08         ldy undoindex
-000B9D  1  C0 00            cpy #$0 ; index at first position?
-000B9F  1  D0 04            bne @normalindex
-000BA1  1  A0 09            ldy #MAXUNDO-1 ; move it to the 'previous' index position in a circular manner
-000BA3  1  80 01            bra @next
-000BA5  1               @normalindex:
-000BA5  1  88               dey ; move it to the 'previous' index position
-000BA6  1               @next:
-000BA6  1  8C CD 08         sty undoindex
-000BA9  1                   ; y now points to the previous move, as an index to the stack memory
-000BA9  1  B1 32            lda (ZP_PTR_UNDO),y
-000BAB  1  AA               tax
-000BAC  1  60               rts
+000B1A  1                   ; load pointer 2 to the top of the previous player's position
+000B1A  1  38               sec
+000B1B  1  A5 00            lda ZP_PTR_1
+000B1D  1  ED F4 08         sbc fieldwidth
+000B20  1  85 22            sta ZP_PTR_2
+000B22  1  A5 01            lda ZP_PTR_1+1
+000B24  1  E9 00            sbc #$0
+000B26  1  85 23            sta ZP_PTR_2+1
+000B28  1               
+000B28  1  20 2A 0C         jsr movecrateonfield
+000B2B  1               @done:
+000B2B  1  20 72 0F         jsr cls
+000B2E  1  20 89 11         jsr printfield2
+000B31  1  60               rts
+000B32  1               
+000B32  1               handledown:
+000B32  1                   ; pointers
+000B32  1                   ; 3 - player
+000B32  1                   ; 2 - block to the bottom of the player
+000B32  1                   ; 1 - block to the bottom of that block
+000B32  1               
+000B32  1                   ; ZP_PTR_2 = ZP_PTR_3 + 1xFIELDWIDTH
+000B32  1  AD F4 08         lda fieldwidth
+000B35  1  85 30            sta temp
+000B37  1  18               clc
+000B38  1  A5 24            lda ZP_PTR_3
+000B3A  1  65 30            adc temp
+000B3C  1  85 22            sta ZP_PTR_2
+000B3E  1  A5 25            lda ZP_PTR_3+1
+000B40  1  69 00            adc #$0
+000B42  1  85 23            sta ZP_PTR_2+1
+000B44  1               
+000B44  1                   ; ZP_PTR_1 = ZP_PTR_1 + 2xFIELDWIDTH
+000B44  1  AD F4 08         lda fieldwidth
+000B47  1  0A               asl ; 2x
+000B48  1  85 30            sta temp
+000B4A  1  18               clc
+000B4B  1  A5 24            lda ZP_PTR_3
+000B4D  1  65 30            adc temp
+000B4F  1  85 00            sta ZP_PTR_1
+000B51  1  A5 25            lda ZP_PTR_3+1
+000B53  1  69 00            adc #$0
+000B55  1  85 01            sta ZP_PTR_1+1
+000B57  1               
+000B57  1  A2 04            ldx #%00000100 ; down direction
+000B59  1  20 98 0B         jsr handlemove
+000B5C  1               
+000B5C  1  60               rts
+000B5D  1               
+000B5D  1               handle_undo_down:
+000B5D  1                   ; 3 - player
+000B5D  1               
+000B5D  1  DA               phx ; store x to stack
+000B5E  1               
+000B5E  1                   ; point 1 to player
+000B5E  1  A5 24            lda ZP_PTR_3
+000B60  1  85 00            sta ZP_PTR_1
+000B62  1  A5 25            lda ZP_PTR_3+1
+000B64  1  85 01            sta ZP_PTR_1+1
+000B66  1               
+000B66  1                   ; pointer 2 will point to the position up of the player
+000B66  1                   ; so the player will move back up
+000B66  1  38               sec
+000B67  1  A5 24            lda ZP_PTR_3
+000B69  1  ED F4 08         sbc fieldwidth
+000B6C  1  85 22            sta ZP_PTR_2
+000B6E  1  A5 25            lda ZP_PTR_3+1
+000B70  1  E9 00            sbc #$0
+000B72  1  85 23            sta ZP_PTR_2+1
+000B74  1               
+000B74  1  20 6B 0C         jsr moveplayeronfield
+000B77  1  20 21 0C         jsr moveplayerposition
+000B7A  1               
+000B7A  1                   ; check crate move, and if so, move it using pointer 2 -> 1
+000B7A  1  FA               plx
+000B7B  1  8A               txa
+000B7C  1  29 10            and #%00010000 ; was a crate moved in this move?
+000B7E  1  F0 11            beq @done
+000B80  1               
+000B80  1                   ; load pointer 2 to the bottom of the previous player's position
+000B80  1  18               clc
+000B81  1  A5 00            lda ZP_PTR_1
+000B83  1  6D F4 08         adc fieldwidth
+000B86  1  85 22            sta ZP_PTR_2
+000B88  1  A5 01            lda ZP_PTR_1+1
+000B8A  1  69 00            adc #$0
+000B8C  1  85 23            sta ZP_PTR_2+1
+000B8E  1               
+000B8E  1  20 2A 0C         jsr movecrateonfield
+000B91  1               @done:
+000B91  1  20 72 0F         jsr cls
+000B94  1  20 89 11         jsr printfield2
+000B97  1  60               rts
+000B98  1               
+000B98  1               handlemove:
+000B98  1                   ; pointers
+000B98  1                   ; 3 - points to the player position
+000B98  1                   ; 2 - points to the next block at the indicated direction
+000B98  1                   ; 1 - points to the block after that block
+000B98  1               
+000B98  1  DA               phx ; push x to stack with stored direction
+000B99  1               
+000B99  1  A0 00            ldy #0
+000B9B  1  B1 22            lda (ZP_PTR_2),y
+000B9D  1  C9 20            cmp #' ' ; empty block next to player?
+000B9F  1  F0 06            beq @moveplayertopoint2
+000BA1  1  C9 2E            cmp #'.' ; goal position next to player?
+000BA3  1  F0 02            beq @moveplayertopoint2
+000BA5  1  80 0C            bra @next ; no ' ' or '.' found next to player, is it a crate or a wall?
+000BA7  1               @moveplayertopoint2:
+000BA7  1                   ; move player to pointer 2
+000BA7  1  20 6B 0C         jsr moveplayeronfield
+000BAA  1  20 21 0C         jsr moveplayerposition
 000BAD  1               
-000BAD  1               moveplayerposition:
-000BAD  1                   ; moves pointer 3 to position of pointer 2
-000BAD  1  A5 22            lda ZP_PTR_2
-000BAF  1  85 24            sta ZP_PTR_3
-000BB1  1  A5 23            lda ZP_PTR_2+1
-000BB3  1  85 25            sta ZP_PTR_3+1
-000BB5  1  60               rts
-000BB6  1               
-000BB6  1               movecrateonfield:
-000BB6  1                   ; copies (ZP_PTR_2) to (ZP_PTR_1)
-000BB6  1                   ; and handles different crate move options (normal / crate on goal)
-000BB6  1  A0 00            ldy #0
-000BB8  1  B1 22            lda (ZP_PTR_2),y
-000BBA  1                   ; was there a goal underneath the crate?
-000BBA  1  C9 2A            cmp #'*'
-000BBC  1  D0 1D            bne @crateonly
-000BBE  1                   ; do we move to a goal position? (from goal to goal..)
-000BBE  1  B1 00            lda (ZP_PTR_1),y
-000BC0  1  C9 2E            cmp #'.'
-000BC2  1  D0 0A            bne @movetonormalposition
-000BC4  1               @movetogoalposition:
-000BC4  1  A9 2A            lda #'*' ; crate on goal symbol
-000BC6  1  91 00            sta (ZP_PTR_1),y
-000BC8  1  A9 2E            lda #'.'
-000BCA  1  91 22            sta (ZP_PTR_2),y
-000BCC  1  80 28            bra @done
-000BCE  1               @movetonormalposition:
-000BCE  1  CE BE 08         dec no_goalsreached ; -1 win points
-000BD1  1  A9 24            lda #'$'; crate symbol
-000BD3  1  91 00            sta (ZP_PTR_1),y
-000BD5  1  A9 2E            lda #'.'
-000BD7  1  91 22            sta (ZP_PTR_2),y
-000BD9  1  80 1B            bra @done
-000BDB  1               @crateonly:
-000BDB  1                   ; is the destination a goal?
-000BDB  1  B1 00            lda (ZP_PTR_1),y
-000BDD  1  C9 2E            cmp #'.'
-000BDF  1  D0 0D            bne @crateonly_nongoal
-000BE1  1                   ; crate moves to goal, from a non-goal position
-000BE1  1  EE BE 08         inc no_goalsreached ; +1 to win
-000BE4  1  A9 2A            lda #'*'
-000BE6  1  91 00            sta (ZP_PTR_1),y
-000BE8  1  A9 20            lda #' '
-000BEA  1  91 22            sta (ZP_PTR_2),y
-000BEC  1  80 08            bra @done
-000BEE  1               @crateonly_nongoal:
-000BEE  1  A9 24            lda #'$'
-000BF0  1  91 00            sta (ZP_PTR_1),y
-000BF2  1  A9 20            lda #' '; empty space to move the player in next
-000BF4  1  91 22            sta (ZP_PTR_2),y
-000BF6  1               @done:
-000BF6  1  60               rts
-000BF7  1               
-000BF7  1               moveplayeronfield:
-000BF7  1                   ; copies (ZP_PTR_3) to (ZP_PTR_2)
-000BF7  1                   ; and handles multiple player move options (normal / on goal)
-000BF7  1  A0 00            ldy #0
-000BF9  1  B1 24            lda (ZP_PTR_3),y
-000BFB  1                   ; was there a goal underneath the player?
-000BFB  1  C9 2B            cmp #'+'
-000BFD  1  D0 1A            bne @playeronly
-000BFF  1                   ; do we move to a goal position? (from goal to goal..)
-000BFF  1  B1 22            lda (ZP_PTR_2),y
-000C01  1  C9 2E            cmp #'.'
-000C03  1  D0 0A            bne @movetonormalposition
-000C05  1               @movetogoalposition:
-000C05  1  A9 2B            lda #'+' ; player on goal symbol
-000C07  1  91 22            sta (ZP_PTR_2),y
-000C09  1  A9 2E            lda #'.'
-000C0B  1  91 24            sta (ZP_PTR_3),y
-000C0D  1  80 22            bra @done
-000C0F  1               @movetonormalposition:
-000C0F  1  A9 40            lda #'@'; player symbol
-000C11  1  91 22            sta (ZP_PTR_2),y
-000C13  1  A9 2E            lda #'.'
-000C15  1  91 24            sta (ZP_PTR_3),y
-000C17  1  80 18            bra @done
-000C19  1               @playeronly:
-000C19  1                   ; is the destination a goal?
-000C19  1  B1 22            lda (ZP_PTR_2),y
-000C1B  1  C9 2E            cmp #'.'
-000C1D  1  D0 0A            bne @playeronly_nongoal
-000C1F  1                   ; player moves to goal, from a non-goal position
-000C1F  1  A9 2B            lda #'+'
-000C21  1  91 22            sta (ZP_PTR_2),y
-000C23  1  A9 20            lda #' '
-000C25  1  91 24            sta (ZP_PTR_3),y
-000C27  1  80 08            bra @done
-000C29  1               @playeronly_nongoal:
-000C29  1  A9 40            lda #'@'
-000C2B  1  91 22            sta (ZP_PTR_2),y
-000C2D  1  A9 20            lda #' '; empty space
-000C2F  1  91 24            sta (ZP_PTR_3),y
-000C31  1               @done:
-000C31  1  60               rts
-000C32  1               
-000C32  1               print:
-000C32  1                   ; console routines only
-000C32  1                   ; print from address ZP_PTR_1
-000C32  1                   ; don't end with newline character
-000C32  1  5A               phy
-000C33  1  A0 00            ldy #0
-000C35  1               @loop:
-000C35  1  B1 00            lda (ZP_PTR_1),y ; load character from address
-000C37  1  F0 06            beq @done        ; end at 0 character
-000C39  1  20 D2 FF         jsr CHROUT
-000C3C  1  C8               iny
-000C3D  1  80 F6            bra @loop
-000C3F  1               @done:
-000C3F  1  7A               ply
-000C40  1  60               rts
-000C41  1               
-000C41  1               printline:
-000C41  1                   ; console routines only
-000C41  1                   ; print from address ZP_PTR_1
-000C41  1                   ; end with newline character
-000C41  1  20 32 0C         jsr print
-000C44  1  A9 0D            lda #NEWLINE
-000C46  1  20 D2 FF         jsr CHROUT
-000C49  1  60               rts
-000C4A  1               
-000C4A  1               printwinstatement:
-000C4A  1                   ; console routines only
-000C4A  1  A9 48            lda #<winstatement
-000C4C  1  85 00            sta ZP_PTR_1
-000C4E  1  A9 08            lda #>winstatement
-000C50  1  85 01            sta ZP_PTR_1+1
-000C52  1  20 41 0C         jsr printline
-000C55  1  60               rts
-000C56  1               
-000C56  1               printdecimal:
-000C56  1                   ; prints decimal from A register
-000C56  1                   ; VERA control needs to be set up previously
-000C56  1  DA               phx
-000C57  1  5A               phy
-000C58  1  86 30            stx temp    ; keep color to print in
-000C5A  1  A0 2F            ldy #$2f
-000C5C  1  A2 3A            ldx #$3a
-000C5E  1  38               sec
-000C5F  1               @loop1:
-000C5F  1  C8               iny
-000C60  1  E9 64            sbc #100
-000C62  1  B0 FB            bcs @loop1
-000C64  1               @loop2:
-000C64  1  CA               dex
-000C65  1  69 0A            adc #10
-000C67  1  30 FB            bmi @loop2
-000C69  1  69 2F            adc #$2f
+000BAD  1  FA               plx ; pull direction from the stack
+000BAE  1  20 E6 0B         jsr push_undostack
+000BB1  1  80 2A            bra @movecomplete
+000BB3  1               @next:
+000BB3  1  A0 00            ldy #0
+000BB5  1  B1 22            lda (ZP_PTR_2),y
+000BB7  1  C9 24            cmp #'$' ; crate next to player?
+000BB9  1  F0 06            beq @combinedmovecheck
+000BBB  1  C9 2A            cmp #'*' ; crate on goal next to player?
+000BBD  1  F0 02            beq @combinedmovecheck
+000BBF  1  80 23            bra @ignore ; something else not able to push
+000BC1  1               @combinedmovecheck:
+000BC1  1  B1 00            lda (ZP_PTR_1),y
+000BC3  1  C9 20            cmp #' ' ; space after crate?
+000BC5  1  F0 06            beq @combinedmove
+000BC7  1  C9 2E            cmp #'.' ; goal after crate?
+000BC9  1  F0 02            beq @combinedmove
+000BCB  1  80 17            bra @ignore ; nothing to move
+000BCD  1               @combinedmove:
+000BCD  1  20 2A 0C         jsr movecrateonfield
+000BD0  1  20 6B 0C         jsr moveplayeronfield
+000BD3  1  20 21 0C         jsr moveplayerposition
+000BD6  1               
+000BD6  1                   ; record combined move to undo stack
+000BD6  1  68               pla
+000BD7  1  09 10            ora #%00010000   ; set 'combined' bit 4
+000BD9  1  AA               tax
+000BDA  1  20 E6 0B         jsr push_undostack
+000BDD  1               
+000BDD  1               @movecomplete:
+000BDD  1  20 89 11         jsr printfield2
+000BE0  1  20 72 0F         jsr cls
+000BE3  1  60               rts
+000BE4  1               
+000BE4  1               @ignore: ; nothing to move
+000BE4  1  FA               plx  ; don't forget to remove the stacked x move
+000BE5  1  60               rts
+000BE6  1               
+000BE6  1               push_undostack:
+000BE6  1                   ; record single move to undo stack
+000BE6  1                   ; x contains direction and single/multiple move
+000BE6  1                   ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
+000BE6  1                   ;
+000BE6  1                   ; the stack index 'pointer' undoindex points to a new entry each time
+000BE6  1  8A               txa
+000BE7  1  AC 02 09         ldy undoindex
+000BEA  1  91 32            sta (ZP_PTR_UNDO),y
+000BEC  1               
+000BEC  1  C0 09            cpy #MAXUNDO-1 ; at last physical item in memory? then loop around
+000BEE  1  F0 05            beq @loopindex
+000BF0  1  EE 02 09         inc undoindex
+000BF3  1  80 03            bra @checkmaxcount
+000BF5  1                @loopindex:
+000BF5  1  9C 02 09         stz undoindex
+000BF8  1                @checkmaxcount:
+000BF8  1  AD 03 09         lda undocounter
+000BFB  1  C9 0A            cmp #MAXUNDO
+000BFD  1  F0 03            beq @done ; maximum count reached / stack will loop around
+000BFF  1  EE 03 09         inc undocounter
+000C02  1                @done:
+000C02  1  60               rts
+000C03  1               
+000C03  1               pull_undostack:
+000C03  1                   ; remove single move from undo stack
+000C03  1                   ; afterwards, x contains direction and single/multiple move
+000C03  1                   ; x = 0%000MUDRL - Multiple / Up / Down / Right / Left
+000C03  1               
+000C03  1  AD 03 09         lda undocounter ; check if we have any moves pushed to the stack
+000C06  1  D0 03            bne @stackedmoves
+000C08  1  A2 00            ldx #$0 ; empty move, nothing in the stack
+000C0A  1  60               rts
+000C0B  1               
+000C0B  1               @stackedmoves:
+000C0B  1  CE 03 09         dec undocounter ; reduce the number pushed to the stack with 1
+000C0E  1  AC 02 09         ldy undoindex
+000C11  1  C0 00            cpy #$0 ; index at first position?
+000C13  1  D0 04            bne @normalindex
+000C15  1  A0 09            ldy #MAXUNDO-1 ; move it to the 'previous' index position in a circular manner
+000C17  1  80 01            bra @next
+000C19  1               @normalindex:
+000C19  1  88               dey ; move it to the 'previous' index position
+000C1A  1               @next:
+000C1A  1  8C 02 09         sty undoindex
+000C1D  1                   ; y now points to the previous move, as an index to the stack memory
+000C1D  1  B1 32            lda (ZP_PTR_UNDO),y
+000C1F  1  AA               tax
+000C20  1  60               rts
+000C21  1               
+000C21  1               moveplayerposition:
+000C21  1                   ; moves pointer 3 to position of pointer 2
+000C21  1  A5 22            lda ZP_PTR_2
+000C23  1  85 24            sta ZP_PTR_3
+000C25  1  A5 23            lda ZP_PTR_2+1
+000C27  1  85 25            sta ZP_PTR_3+1
+000C29  1  60               rts
+000C2A  1               
+000C2A  1               movecrateonfield:
+000C2A  1                   ; copies (ZP_PTR_2) to (ZP_PTR_1)
+000C2A  1                   ; and handles different crate move options (normal / crate on goal)
+000C2A  1  A0 00            ldy #0
+000C2C  1  B1 22            lda (ZP_PTR_2),y
+000C2E  1                   ; was there a goal underneath the crate?
+000C2E  1  C9 2A            cmp #'*'
+000C30  1  D0 1D            bne @crateonly
+000C32  1                   ; do we move to a goal position? (from goal to goal..)
+000C32  1  B1 00            lda (ZP_PTR_1),y
+000C34  1  C9 2E            cmp #'.'
+000C36  1  D0 0A            bne @movetonormalposition
+000C38  1               @movetogoalposition:
+000C38  1  A9 2A            lda #'*' ; crate on goal symbol
+000C3A  1  91 00            sta (ZP_PTR_1),y
+000C3C  1  A9 2E            lda #'.'
+000C3E  1  91 22            sta (ZP_PTR_2),y
+000C40  1  80 28            bra @done
+000C42  1               @movetonormalposition:
+000C42  1  CE F3 08         dec no_goalsreached ; -1 win points
+000C45  1  A9 24            lda #'$'; crate symbol
+000C47  1  91 00            sta (ZP_PTR_1),y
+000C49  1  A9 2E            lda #'.'
+000C4B  1  91 22            sta (ZP_PTR_2),y
+000C4D  1  80 1B            bra @done
+000C4F  1               @crateonly:
+000C4F  1                   ; is the destination a goal?
+000C4F  1  B1 00            lda (ZP_PTR_1),y
+000C51  1  C9 2E            cmp #'.'
+000C53  1  D0 0D            bne @crateonly_nongoal
+000C55  1                   ; crate moves to goal, from a non-goal position
+000C55  1  EE F3 08         inc no_goalsreached ; +1 to win
+000C58  1  A9 2A            lda #'*'
+000C5A  1  91 00            sta (ZP_PTR_1),y
+000C5C  1  A9 20            lda #' '
+000C5E  1  91 22            sta (ZP_PTR_2),y
+000C60  1  80 08            bra @done
+000C62  1               @crateonly_nongoal:
+000C62  1  A9 24            lda #'$'
+000C64  1  91 00            sta (ZP_PTR_1),y
+000C66  1  A9 20            lda #' '; empty space to move the player in next
+000C68  1  91 22            sta (ZP_PTR_2),y
+000C6A  1               @done:
+000C6A  1  60               rts
 000C6B  1               
-000C6B  1                   ; Y = hundreds, X = tens, A = ones
-000C6B  1  48               pha
-000C6C  1  8A               txa
-000C6D  1  48               pha
-000C6E  1  98               tya
-000C6F  1  C9 30            cmp #$30 ; is it a '0' petscii?
-000C71  1  F0 08            beq @tens
-000C73  1               ;    jsr CHROUT ; print Y
-000C73  1  8D 23 9F         sta VERA_DATA0
-000C76  1  A5 30            lda temp
-000C78  1  8D 23 9F         sta VERA_DATA0
-000C7B  1               @tens:
-000C7B  1  68               pla
-000C7C  1  C9 30            cmp #$30 ; is it a '0' petscii?
-000C7E  1  F0 08            beq @ones
-000C80  1               ;    jsr CHROUT ; print X
-000C80  1  8D 23 9F         sta VERA_DATA0
-000C83  1  A5 30            lda temp
-000C85  1  8D 23 9F         sta VERA_DATA0
-000C88  1               @ones:
-000C88  1  68               pla
-000C89  1               ;    jsr CHROUT ; print A
-000C89  1  8D 23 9F         sta VERA_DATA0
-000C8C  1  A5 30            lda temp
-000C8E  1  8D 23 9F         sta VERA_DATA0
-000C91  1               
-000C91  1  7A               ply
-000C92  1  FA               plx
-000C93  1  60               rts
-000C94  1               
-000C94  1               selectlevel:
-000C94  1  A9 01            lda #1 ; start out with first level
-000C96  1  8D BB 08         sta currentlevel
-000C99  1               
-000C99  1               @mainloop:
-000C99  1                   ; text prep to VERA
-000C99  1  9C 25 9F         stz VERA_CTRL
-000C9C  1  A2 09            ldx #$9 ; color brown
-000C9E  1  A9 10            lda #$10
-000CA0  1  8D 22 9F         sta VERA_HIGH
-000CA3  1  A9 21            lda #<selectmessage
-000CA5  1  85 00            sta ZP_PTR_1
-000CA7  1  A9 08            lda #>selectmessage
-000CA9  1  85 01            sta ZP_PTR_1+1
-000CAB  1  A9 2D            lda #45
-000CAD  1  8D 21 9F         sta VERA_MID
-000CB0  1  A9 14            lda #10*2
-000CB2  1  8D 20 9F         sta VERA_LOW
-000CB5  1  20 95 0F         jsr printverastring
-000CB8  1               
-000CB8  1               
-000CB8  1                   ; print range
-000CB8  1  AD BC 08         lda no_levels
-000CBB  1  20 56 0C         jsr printdecimal
-000CBE  1  A9 34            lda #<selectendmessage
+000C6B  1               moveplayeronfield:
+000C6B  1                   ; copies (ZP_PTR_3) to (ZP_PTR_2)
+000C6B  1                   ; and handles multiple player move options (normal / on goal)
+000C6B  1  A0 00            ldy #0
+000C6D  1  B1 24            lda (ZP_PTR_3),y
+000C6F  1                   ; was there a goal underneath the player?
+000C6F  1  C9 2B            cmp #'+'
+000C71  1  D0 1A            bne @playeronly
+000C73  1                   ; do we move to a goal position? (from goal to goal..)
+000C73  1  B1 22            lda (ZP_PTR_2),y
+000C75  1  C9 2E            cmp #'.'
+000C77  1  D0 0A            bne @movetonormalposition
+000C79  1               @movetogoalposition:
+000C79  1  A9 2B            lda #'+' ; player on goal symbol
+000C7B  1  91 22            sta (ZP_PTR_2),y
+000C7D  1  A9 2E            lda #'.'
+000C7F  1  91 24            sta (ZP_PTR_3),y
+000C81  1  80 22            bra @done
+000C83  1               @movetonormalposition:
+000C83  1  A9 40            lda #'@'; player symbol
+000C85  1  91 22            sta (ZP_PTR_2),y
+000C87  1  A9 2E            lda #'.'
+000C89  1  91 24            sta (ZP_PTR_3),y
+000C8B  1  80 18            bra @done
+000C8D  1               @playeronly:
+000C8D  1                   ; is the destination a goal?
+000C8D  1  B1 22            lda (ZP_PTR_2),y
+000C8F  1  C9 2E            cmp #'.'
+000C91  1  D0 0A            bne @playeronly_nongoal
+000C93  1                   ; player moves to goal, from a non-goal position
+000C93  1  A9 2B            lda #'+'
+000C95  1  91 22            sta (ZP_PTR_2),y
+000C97  1  A9 20            lda #' '
+000C99  1  91 24            sta (ZP_PTR_3),y
+000C9B  1  80 08            bra @done
+000C9D  1               @playeronly_nongoal:
+000C9D  1  A9 40            lda #'@'
+000C9F  1  91 22            sta (ZP_PTR_2),y
+000CA1  1  A9 20            lda #' '; empty space
+000CA3  1  91 24            sta (ZP_PTR_3),y
+000CA5  1               @done:
+000CA5  1  60               rts
+000CA6  1               
+000CA6  1               print:
+000CA6  1                   ; console routines only
+000CA6  1                   ; print from address ZP_PTR_1
+000CA6  1                   ; don't end with newline character
+000CA6  1  5A               phy
+000CA7  1  A0 00            ldy #0
+000CA9  1               @loop:
+000CA9  1  B1 00            lda (ZP_PTR_1),y ; load character from address
+000CAB  1  F0 06            beq @done        ; end at 0 character
+000CAD  1  20 D2 FF         jsr CHROUT
+000CB0  1  C8               iny
+000CB1  1  80 F6            bra @loop
+000CB3  1               @done:
+000CB3  1  7A               ply
+000CB4  1  60               rts
+000CB5  1               
+000CB5  1               printline:
+000CB5  1                   ; console routines only
+000CB5  1                   ; print from address ZP_PTR_1
+000CB5  1                   ; end with newline character
+000CB5  1  20 A6 0C         jsr print
+000CB8  1  A9 0D            lda #NEWLINE
+000CBA  1  20 D2 FF         jsr CHROUT
+000CBD  1  60               rts
+000CBE  1               
+000CBE  1               printwinstatement:
+000CBE  1                   ; console routines only
+000CBE  1  A9 60            lda #<winstatement
 000CC0  1  85 00            sta ZP_PTR_1
-000CC2  1  A9 08            lda #>selectendmessage
+000CC2  1  A9 08            lda #>winstatement
 000CC4  1  85 01            sta ZP_PTR_1+1
-000CC6  1  20 95 0F         jsr printverastring
-000CC9  1                   ; print level number
-000CC9  1  AD BB 08         lda currentlevel
-000CCC  1  20 56 0C         jsr printdecimal
-000CCF  1               
-000CCF  1               @charloop:
-000CCF  1  20 E4 FF         jsr GETIN
-000CD2  1               @checkdown:
-000CD2  1  C9 11            cmp #$11 ; down pressed
-000CD4  1  F0 06            beq @down
-000CD6  1  C9 9D            cmp #$9d ; left pressed
-000CD8  1  F0 02            beq @down
-000CDA  1  80 0C            bra @checkup
-000CDC  1               @down:
-000CDC  1                   ; down key pressed
-000CDC  1  AD BB 08         lda currentlevel
-000CDF  1  C9 01            cmp #1
-000CE1  1  F0 EC            beq @charloop   ; lowest value == 1
-000CE3  1  CE BB 08         dec currentlevel
-000CE6  1  80 B1            bra @mainloop
-000CE8  1               @checkup:
-000CE8  1  C9 91            cmp #$91 ; up pressed
-000CEA  1  F0 06            beq @up
-000CEC  1  C9 1D            cmp #$1d ; right pressed
-000CEE  1  F0 02            beq @up
-000CF0  1  80 0D            bra @checkreturnkey
-000CF2  1               @up:
-000CF2  1                   ; up key pressed
-000CF2  1  AD BB 08         lda currentlevel
-000CF5  1  CD BC 08         cmp no_levels
-000CF8  1  F0 D5            beq @charloop   ; maximum value reached
-000CFA  1  EE BB 08         inc currentlevel
-000CFD  1  80 9A            bra @mainloop
-000CFF  1               @checkreturnkey:
-000CFF  1  C9 0D            cmp #$0d
-000D01  1  D0 CC            bne @charloop
-000D03  1                   ; return key pressed - select this level
-000D03  1  20 FE 0E         jsr cls
-000D06  1  60               rts
-000D07  1               
-000D07  1               resetvars:
-000D07  1                   ; reset goals
-000D07  1  A9 00            lda #0
-000D09  1  8D BE 08         sta no_goalsreached
-000D0C  1               
-000D0C  1                   ; load field pointer to first address at LOADSTART
-000D0C  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000D0C  1  A9 29            lda #<LOADSTART
-000D0E  1  85 00            sta ZP_PTR_1
-000D10  1  A9 38            lda #>LOADSTART
-000D12  1  85 01            sta ZP_PTR_1+1
-000D14  1               
-000D14  1                   ; load number of levels, pointed to by ZP_PTR_1,0
-000D14  1  A0 00            ldy #0
-000D16  1  B1 00            lda (ZP_PTR_1),y
-000D18  1  8D BC 08         sta no_levels
-000D1B  1               
-000D1B  1                   ; reset undo stack
-000D1B  1  A9 C3            lda #<undostack
-000D1D  1  85 32            sta ZP_PTR_UNDO
-000D1F  1  A9 08            lda #>undostack
-000D21  1  85 33            sta ZP_PTR_UNDO+1
-000D23  1               
-000D23  1  9C CD 08         stz undoindex
-000D26  1  9C CE 08         stz undocounter
-000D29  1  60               rts
-000D2A  1               
-000D2A  1               level_to_rambank:
-000D2A  1                   ; copy selected level data to Ram bank 0
-000D2A  1                   ; uses ZP_PTR_1 & ZP_PTR_2, temp for storing amount of bytes to copy
-000D2A  1               
-000D2A  1                   ; start at 2 bytes, the size of the word storing the number of levels
-000D2A  1  A9 02            lda #02
-000D2C  1  85 30            sta temp
-000D2E  1  64 31            stz temp+1
-000D30  1               
-000D30  1                   ; ZP_PTR_1 will point to the source data
-000D30  1  A9 29            lda #<LOADSTART
-000D32  1  85 00            sta ZP_PTR_1
-000D34  1  A9 38            lda #>LOADSTART
-000D36  1  85 01            sta ZP_PTR_1+1
-000D38  1               
-000D38  1                   ; load number of levels, pointed to by ZP_PTR_1,0
-000D38  1  A0 00            ldy #0
-000D3A  1  B1 00            lda (ZP_PTR_1),y
-000D3C  1  8D BC 08         sta no_levels
-000D3F  1               
-000D3F  1                   ; start at first level HEADER
-000D3F  1  A9 29            lda #<LOADSTART
-000D41  1  18               clc
-000D42  1  69 02            adc #2
-000D44  1  85 00            sta ZP_PTR_1
-000D46  1  A9 38            lda #>LOADSTART
-000D48  1  85 01            sta ZP_PTR_1+1
-000D4A  1               
-000D4A  1               ; iterate through each header and add the level's size to the temp variable
-000D4A  1               @nextlevel:
-000D4A  1                   ; go to width variable
-000D4A  1  A0 02            ldy #2
-000D4C  1                   ; store width variable to fieldwidth - this is a 8-bit variable, so no high byte needed
-000D4C  1  B1 00            lda (ZP_PTR_1),y
-000D4E  1  8D BF 08         sta fieldwidth
-000D51  1                   ; go to height variable
-000D51  1  C8               iny
-000D52  1  C8               iny
-000D53  1  B1 00            lda (ZP_PTR_1),y
-000D55  1  AA               tax ; loop counter
-000D56  1               
-000D56  1               @multiply:
-000D56  1                   ; add fieldwidth variable to temp at each interation - temp = temp + (width * height)
-000D56  1  A5 30            lda temp
-000D58  1  18               clc
-000D59  1  6D BF 08         adc fieldwidth
-000D5C  1  85 30            sta temp
-000D5E  1  A5 31            lda temp+1 ; don't forget the high byte
-000D60  1  69 00            adc #0
-000D62  1  85 31            sta temp+1
-000D64  1  CA               dex
-000D65  1  D0 EF            bne @multiply
-000D67  1               
-000D67  1                   ; add HEADER size for this level to temp
-000D67  1  A5 30            lda temp
-000D69  1  18               clc
-000D6A  1  69 0A            adc #LEVELHEADER
-000D6C  1  85 30            sta temp
-000D6E  1  A5 31            lda temp+1
-000D70  1  69 00            adc #0
-000D72  1  85 31            sta temp+1
-000D74  1               
-000D74  1                   ; next level?
-000D74  1  CE BC 08         dec no_levels
-000D77  1  F0 0F            beq @copydata
-000D79  1               
-000D79  1                   ; next header
-000D79  1  18               clc
-000D7A  1  A5 00            lda ZP_PTR_1
-000D7C  1  69 0A            adc #10
-000D7E  1  85 00            sta ZP_PTR_1
-000D80  1  A5 01            lda ZP_PTR_1+1
-000D82  1  69 00            adc #0
-000D84  1  85 01            sta ZP_PTR_1+1
-000D86  1               
-000D86  1  80 C2            bra @nextlevel
-000D88  1               @copydata:
-000D88  1                   ; copy (temp) amount of bytes from LOADSTART to Ram bank 0
+000CC6  1  20 B5 0C         jsr printline
+000CC9  1  60               rts
+000CCA  1               
+000CCA  1               printdecimal:
+000CCA  1                   ; prints decimal from A register
+000CCA  1                   ; VERA control needs to be set up previously
+000CCA  1  DA               phx
+000CCB  1  5A               phy
+000CCC  1  86 30            stx temp    ; keep color to print in
+000CCE  1  A0 2F            ldy #$2f
+000CD0  1  A2 3A            ldx #$3a
+000CD2  1  38               sec
+000CD3  1               @loop1:
+000CD3  1  C8               iny
+000CD4  1  E9 64            sbc #100
+000CD6  1  B0 FB            bcs @loop1
+000CD8  1               @loop2:
+000CD8  1  CA               dex
+000CD9  1  69 0A            adc #10
+000CDB  1  30 FB            bmi @loop2
+000CDD  1  69 2F            adc #$2f
+000CDF  1               
+000CDF  1                   ; Y = hundreds, X = tens, A = ones
+000CDF  1  48               pha
+000CE0  1  8A               txa
+000CE1  1  48               pha
+000CE2  1  98               tya
+000CE3  1  C9 30            cmp #$30 ; is it a '0' petscii?
+000CE5  1  F0 08            beq @tens
+000CE7  1               ;    jsr CHROUT ; print Y
+000CE7  1  8D 23 9F         sta VERA_DATA0
+000CEA  1  A5 30            lda temp
+000CEC  1  8D 23 9F         sta VERA_DATA0
+000CEF  1               @tens:
+000CEF  1  68               pla
+000CF0  1  C9 30            cmp #$30 ; is it a '0' petscii?
+000CF2  1  F0 08            beq @ones
+000CF4  1               ;    jsr CHROUT ; print X
+000CF4  1  8D 23 9F         sta VERA_DATA0
+000CF7  1  A5 30            lda temp
+000CF9  1  8D 23 9F         sta VERA_DATA0
+000CFC  1               @ones:
+000CFC  1  68               pla
+000CFD  1               ;    jsr CHROUT ; print A
+000CFD  1  8D 23 9F         sta VERA_DATA0
+000D00  1  A5 30            lda temp
+000D02  1  8D 23 9F         sta VERA_DATA0
+000D05  1               
+000D05  1  7A               ply
+000D06  1  FA               plx
+000D07  1  60               rts
+000D08  1               
+000D08  1               selectlevel:
+000D08  1  A9 01            lda #1 ; start out with first level
+000D0A  1  8D F0 08         sta currentlevel
+000D0D  1               
+000D0D  1               @mainloop:
+000D0D  1                   ; text prep to VERA
+000D0D  1  9C 25 9F         stz VERA_CTRL
+000D10  1  A2 09            ldx #$9 ; color brown
+000D12  1  A9 10            lda #$10
+000D14  1  8D 22 9F         sta VERA_HIGH
+000D17  1  A9 21            lda #<selectmessage
+000D19  1  85 00            sta ZP_PTR_1
+000D1B  1  A9 08            lda #>selectmessage
+000D1D  1  85 01            sta ZP_PTR_1+1
+000D1F  1  A9 2D            lda #45
+000D21  1  8D 21 9F         sta VERA_MID
+000D24  1  A9 14            lda #10*2
+000D26  1  8D 20 9F         sta VERA_LOW
+000D29  1  20 09 10         jsr printverastring
+000D2C  1               
+000D2C  1               
+000D2C  1                   ; print range
+000D2C  1  AD F1 08         lda no_levels
+000D2F  1  20 CA 0C         jsr printdecimal
+000D32  1  A9 34            lda #<selectendmessage
+000D34  1  85 00            sta ZP_PTR_1
+000D36  1  A9 08            lda #>selectendmessage
+000D38  1  85 01            sta ZP_PTR_1+1
+000D3A  1  20 09 10         jsr printverastring
+000D3D  1                   ; print level number
+000D3D  1  AD F0 08         lda currentlevel
+000D40  1  20 CA 0C         jsr printdecimal
+000D43  1               
+000D43  1               @charloop:
+000D43  1  20 E4 FF         jsr GETIN
+000D46  1               @checkdown:
+000D46  1  C9 11            cmp #$11 ; down pressed
+000D48  1  F0 06            beq @down
+000D4A  1  C9 9D            cmp #$9d ; left pressed
+000D4C  1  F0 02            beq @down
+000D4E  1  80 0C            bra @checkup
+000D50  1               @down:
+000D50  1                   ; down key pressed
+000D50  1  AD F0 08         lda currentlevel
+000D53  1  C9 01            cmp #1
+000D55  1  F0 EC            beq @charloop   ; lowest value == 1
+000D57  1  CE F0 08         dec currentlevel
+000D5A  1  80 B1            bra @mainloop
+000D5C  1               @checkup:
+000D5C  1  C9 91            cmp #$91 ; up pressed
+000D5E  1  F0 06            beq @up
+000D60  1  C9 1D            cmp #$1d ; right pressed
+000D62  1  F0 02            beq @up
+000D64  1  80 0D            bra @checkreturnkey
+000D66  1               @up:
+000D66  1                   ; up key pressed
+000D66  1  AD F0 08         lda currentlevel
+000D69  1  CD F1 08         cmp no_levels
+000D6C  1  F0 D5            beq @charloop   ; maximum value reached
+000D6E  1  EE F0 08         inc currentlevel
+000D71  1  80 9A            bra @mainloop
+000D73  1               @checkreturnkey:
+000D73  1  C9 0D            cmp #$0d
+000D75  1  D0 CC            bne @charloop
+000D77  1                   ; return key pressed - select this level
+000D77  1  20 72 0F         jsr cls
+000D7A  1  60               rts
+000D7B  1               
+000D7B  1               resetvars:
+000D7B  1                   ; reset goals
+000D7B  1  A9 00            lda #0
+000D7D  1  8D F3 08         sta no_goalsreached
+000D80  1               
+000D80  1                   ; load field pointer to first address at LOADSTART
+000D80  1                   ; load 1st pointer to temp pointer ZP_PTR_1
+000D80  1  A9 B2            lda #<LOADSTART
+000D82  1  85 00            sta ZP_PTR_1
+000D84  1  A9 38            lda #>LOADSTART
+000D86  1  85 01            sta ZP_PTR_1+1
 000D88  1               
-000D88  1                   ; set up source pointer
-000D88  1  A9 29            lda #<LOADSTART
-000D8A  1  85 00            sta ZP_PTR_1
-000D8C  1  A9 38            lda #>LOADSTART
-000D8E  1  85 01            sta ZP_PTR_1+1
-000D90  1               
-000D90  1                   ; set up destination pointer
-000D90  1  A9 00            lda #<RAMBANK
-000D92  1  85 22            sta ZP_PTR_2
-000D94  1  A9 A0            lda #>RAMBANK
-000D96  1  85 23            sta ZP_PTR_2+1
-000D98  1               
-000D98  1  A0 00            ldy #0
-000D9A  1               @copybyte:
-000D9A  1                   ; copy one byte of data
-000D9A  1  B1 00            lda (ZP_PTR_1),y
-000D9C  1  91 22            sta (ZP_PTR_2),y
+000D88  1                   ; load number of levels, pointed to by ZP_PTR_1,0
+000D88  1  A0 00            ldy #0
+000D8A  1  B1 00            lda (ZP_PTR_1),y
+000D8C  1  8D F1 08         sta no_levels
+000D8F  1               
+000D8F  1                   ; reset undo stack
+000D8F  1  A9 F8            lda #<undostack
+000D91  1  85 32            sta ZP_PTR_UNDO
+000D93  1  A9 08            lda #>undostack
+000D95  1  85 33            sta ZP_PTR_UNDO+1
+000D97  1               
+000D97  1  9C 02 09         stz undoindex
+000D9A  1  9C 03 09         stz undocounter
+000D9D  1  60               rts
 000D9E  1               
-000D9E  1                   ; temp = temp -1
-000D9E  1  A5 30            lda temp
-000DA0  1  38               sec
-000DA1  1  E9 01            sbc #1
-000DA3  1  85 30            sta temp
-000DA5  1  A5 31            lda temp+1
-000DA7  1  E9 00            sbc #0
-000DA9  1  85 31            sta temp+1
-000DAB  1               
-000DAB  1                   ; if temp==0 done
-000DAB  1  A5 31            lda temp+1
-000DAD  1  D0 06            bne @copynextbyte
-000DAF  1  A5 30            lda temp
-000DB1  1  D0 02            bne @copynextbyte
-000DB3  1  80 1C            bra @done
-000DB5  1               @copynextbyte:
-000DB5  1  A5 00            lda ZP_PTR_1
-000DB7  1  18               clc
-000DB8  1  69 01            adc #1
-000DBA  1  85 00            sta ZP_PTR_1
-000DBC  1  A5 01            lda ZP_PTR_1+1
-000DBE  1  69 00            adc #0
-000DC0  1  85 01            sta ZP_PTR_1+1
-000DC2  1  A5 22            lda ZP_PTR_2
-000DC4  1  18               clc
-000DC5  1  69 01            adc #1
-000DC7  1  85 22            sta ZP_PTR_2
-000DC9  1  A5 23            lda ZP_PTR_2+1
-000DCB  1  69 00            adc #0
-000DCD  1  85 23            sta ZP_PTR_2+1
-000DCF  1  80 C9            bra @copybyte
-000DD1  1               @done:
-000DD1  1  60               rts
-000DD2  1               
-000DD2  1               
-000DD2  1               initfield:
-000DD2  1                   ; load field pointer to first address at LOADSTART
-000DD2  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000DD2  1  A9 29            lda #<LOADSTART
-000DD4  1  85 00            sta ZP_PTR_1
-000DD6  1  A9 38            lda #>LOADSTART
-000DD8  1  85 01            sta ZP_PTR_1+1
-000DDA  1               
-000DDA  1                   ; skip to the first header, two bytes next
-000DDA  1  18               clc
-000DDB  1  A5 00            lda ZP_PTR_1
-000DDD  1  69 02            adc #2
-000DDF  1  85 00            sta ZP_PTR_1
-000DE1  1               
-000DE1  1                   ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
-000DE1  1  AD BB 08         lda currentlevel
-000DE4  1  AA               tax ; x contains the currentlevel now and will act as a counter
-000DE5  1               @loop:
-000DE5  1  CA               dex
-000DE6  1  F0 11            beq @fieldptrdone
-000DE8  1                   ; advance the field payload pointer
-000DE8  1  A5 00            lda ZP_PTR_1
-000DEA  1  18               clc
-000DEB  1  69 0A            adc #LEVELHEADER
-000DED  1  85 00            sta ZP_PTR_1
-000DEF  1  90 F4            bcc @loop   ; nothing to do for the high byte
-000DF1  1  A5 01            lda ZP_PTR_1+1
-000DF3  1  69 00            adc #$0     ; increase the high byte
-000DF5  1  85 01            sta ZP_PTR_1+1
-000DF7  1  80 EC            bra @loop
-000DF9  1               @fieldptrdone:
-000DF9  1               
-000DF9  1  A0 02            ldy #2  ; index from payload pointer to width variable (low byte)
-000DFB  1  B1 00            lda (ZP_PTR_1),y
-000DFD  1  8D BF 08         sta fieldwidth
-000E00  1  A0 04            ldy #4  ; index from payload pointer to height variable (low byte)
-000E02  1  B1 00            lda (ZP_PTR_1),y
-000E04  1  8D C0 08         sta fieldheight
-000E07  1  A0 06            ldy #6  ; index from payload pointer to goals in this level (low byte)
-000E09  1  B1 00            lda (ZP_PTR_1),y
-000E0B  1  8D BD 08         sta no_goals
-000E0E  1  A0 08            ldy #8  ; index from payload pointer to player offset in this level
-000E10  1               
-000E10  1  B1 00            lda (ZP_PTR_1),y
-000E12  1  18               clc
-000E13  1  69 00            adc #<RAMBANK
-000E15  1  85 24            sta ZP_PTR_3
-000E17  1  C8               iny
-000E18  1  B1 00            lda (ZP_PTR_1),y
-000E1A  1  69 A0            adc #>RAMBANK
-000E1C  1  85 25            sta ZP_PTR_3+1
-000E1E  1                   ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
-000E1E  1               
-000E1E  1                   ; now copy the field data to the RAM bank
-000E1E  1  AD C0 08         lda fieldheight
-000E21  1  AA               tax ; create counter
-000E22  1                   ; clear temp counter
-000E22  1  64 30            stz temp
-000E24  1  64 31            stz temp+1
-000E26  1               
-000E26  1               @multiply:
-000E26  1                   ; add fieldwidth variable to temp at each iteration - temp = temp + (width * height)
-000E26  1  A5 30            lda temp
-000E28  1  18               clc
-000E29  1  6D BF 08         adc fieldwidth
-000E2C  1  85 30            sta temp
-000E2E  1  A5 31            lda temp+1 ; don't forget the high byte
-000E30  1  69 00            adc #0
-000E32  1  85 31            sta temp+1
-000E34  1  CA               dex
-000E35  1  D0 EF            bne @multiply
-000E37  1               
-000E37  1                   ; copy (temp) amount of bytes from current field pointer to Ram bank 0
-000E37  1               
-000E37  1                   ; currently ZP_PTR_1 is pointing to the selected field HEADER
-000E37  1                   ; retrieve the field pointer from it, and let ZP_PTR_FIELD to that
-000E37  1  A0 00            ldy #0
-000E39  1  B1 00            lda (ZP_PTR_1),y
-000E3B  1  85 28            sta ZP_PTR_FIELD
-000E3D  1  C8               iny
-000E3E  1  B1 00            lda (ZP_PTR_1),y
-000E40  1  85 29            sta ZP_PTR_FIELD+1
-000E42  1                   ; now let this pointer start counting from LOADSTART, just as the offset in the input file references
-000E42  1  A5 28            lda ZP_PTR_FIELD
-000E44  1  18               clc
-000E45  1  69 29            adc #<LOADSTART
-000E47  1  85 28            sta ZP_PTR_FIELD
-000E49  1  A5 29            lda ZP_PTR_FIELD+1
-000E4B  1  69 38            adc #>LOADSTART
-000E4D  1  85 29            sta ZP_PTR_FIELD+1
-000E4F  1               
-000E4F  1                   ; set up destination pointer
-000E4F  1  A9 00            lda #<RAMBANK
-000E51  1  85 22            sta ZP_PTR_2
-000E53  1  A9 A0            lda #>RAMBANK
-000E55  1  85 23            sta ZP_PTR_2+1
-000E57  1               
-000E57  1  A0 00            ldy #0
-000E59  1               @copybyte:
-000E59  1                   ; copy one byte of data
-000E59  1  B1 28            lda (ZP_PTR_FIELD),y
-000E5B  1  91 22            sta (ZP_PTR_2),y
-000E5D  1               
-000E5D  1                   ; temp = temp -1
-000E5D  1  A5 30            lda temp
-000E5F  1  38               sec
-000E60  1  E9 01            sbc #1
-000E62  1  85 30            sta temp
-000E64  1  A5 31            lda temp+1
-000E66  1  E9 00            sbc #0
-000E68  1  85 31            sta temp+1
-000E6A  1               
-000E6A  1                   ; if temp==0 done
-000E6A  1  A5 31            lda temp+1
-000E6C  1  D0 06            bne @copynextbyte
-000E6E  1  A5 30            lda temp
-000E70  1  D0 02            bne @copynextbyte
-000E72  1  80 1C            bra @done
-000E74  1               @copynextbyte:
-000E74  1  A5 28            lda ZP_PTR_FIELD
-000E76  1  18               clc
-000E77  1  69 01            adc #1
-000E79  1  85 28            sta ZP_PTR_FIELD
-000E7B  1  A5 29            lda ZP_PTR_FIELD+1
-000E7D  1  69 00            adc #0
-000E7F  1  85 29            sta ZP_PTR_FIELD+1
-000E81  1  A5 22            lda ZP_PTR_2
-000E83  1  18               clc
-000E84  1  69 01            adc #1
-000E86  1  85 22            sta ZP_PTR_2
-000E88  1  A5 23            lda ZP_PTR_2+1
-000E8A  1  69 00            adc #0
-000E8C  1  85 23            sta ZP_PTR_2+1
-000E8E  1  80 C9            bra @copybyte
-000E90  1               @done:
-000E90  1               
-000E90  1                   ; prep the field pointer
-000E90  1  A9 00            lda #<RAMBANK
-000E92  1  85 28            sta ZP_PTR_FIELD
-000E94  1  A9 A0            lda #>RAMBANK
-000E96  1  85 29            sta ZP_PTR_FIELD+1
-000E98  1  60               rts
-000E99  1               
-000E99  1               printfield:
-000E99  1                   ; console routines only
-000E99  1                   ; no clearscreen, just print the field to screen on current position
-000E99  1                   ; depends only on
-000E99  1                   ; - field label for start of field
-000E99  1               
-000E99  1  A5 28            lda ZP_PTR_FIELD
-000E9B  1  85 00            sta ZP_PTR_1
-000E9D  1  A5 29            lda ZP_PTR_FIELD+1
-000E9F  1  85 01            sta ZP_PTR_1+1
-000EA1  1  A2 00            ldx #0 ; row counter
-000EA3  1               @nextrow:
-000EA3  1  A0 00            ldy #0 ; column counter
-000EA5  1               @row:
-000EA5  1  B1 00            lda (ZP_PTR_1),y
-000EA7  1  C9 40            cmp #'@'
-000EA9  1  F0 06            beq @character
-000EAB  1  C9 2B            cmp #'+'
-000EAD  1  F0 02            beq @character
-000EAF  1  80 17            bra @normalcolor
-000EB1  1               @character:
-000EB1  1  48               pha
-000EB2  1  A9 9E            lda #$9e ; YELLOW
-000EB4  1  20 D2 FF         jsr CHROUT
-000EB7  1  68               pla
-000EB8  1  20 D2 FF         jsr CHROUT
-000EBB  1  A9 05            lda #$05 ; WHITE
-000EBD  1  20 D2 FF         jsr CHROUT
-000EC0  1  C8               iny
-000EC1  1  CC BF 08         cpy fieldwidth
-000EC4  1  D0 DF            bne @row
-000EC6  1  80 09            bra @endline
-000EC8  1               @normalcolor:
-000EC8  1  20 D2 FF         jsr CHROUT
-000ECB  1  C8               iny
-000ECC  1  CC BF 08         cpy fieldwidth
-000ECF  1  D0 D4            bne @row
-000ED1  1               @endline:
-000ED1  1  A9 0D            lda #NEWLINE
-000ED3  1  20 D2 FF         jsr CHROUT
-000ED6  1               
-000ED6  1                   ; advance pointer to next row
-000ED6  1  A5 00            lda ZP_PTR_1
-000ED8  1  18               clc
-000ED9  1  6D BF 08         adc fieldwidth
-000EDC  1  85 00            sta ZP_PTR_1
-000EDE  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
-000EE0  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-000EE2  1  18               clc
-000EE3  1  69 01            adc #1
-000EE5  1  85 01            sta ZP_PTR_1+1
-000EE7  1               @checklastrow:
-000EE7  1                   ; last row?
-000EE7  1  E8               inx
-000EE8  1  EC C0 08         cpx fieldheight
-000EEB  1  D0 B6            bne @nextrow
-000EED  1               
-000EED  1                   ; print quit message at the end of the field
-000EED  1  A9 0D            lda #NEWLINE
-000EEF  1  20 D2 FF         jsr CHROUT
-000EF2  1  A9 38            lda #<quitmessage
-000EF4  1  85 00            sta ZP_PTR_1
-000EF6  1  A9 08            lda #>quitmessage
-000EF8  1  85 01            sta ZP_PTR_1+1
-000EFA  1  20 41 0C         jsr printline
-000EFD  1               
-000EFD  1  60               rts
-000EFE  1               
-000EFE  1               cls:
-000EFE  1  A9 93            lda #CLEARSCREEN
-000F00  1  20 D2 FF         jsr CHROUT
-000F03  1  60               rts
+000D9E  1               level_to_rambank:
+000D9E  1                   ; copy selected level data to Ram bank 0
+000D9E  1                   ; uses ZP_PTR_1 & ZP_PTR_2, temp for storing amount of bytes to copy
+000D9E  1               
+000D9E  1                   ; start at 2 bytes, the size of the word storing the number of levels
+000D9E  1  A9 02            lda #02
+000DA0  1  85 30            sta temp
+000DA2  1  64 31            stz temp+1
+000DA4  1               
+000DA4  1                   ; ZP_PTR_1 will point to the source data
+000DA4  1  A9 B2            lda #<LOADSTART
+000DA6  1  85 00            sta ZP_PTR_1
+000DA8  1  A9 38            lda #>LOADSTART
+000DAA  1  85 01            sta ZP_PTR_1+1
+000DAC  1               
+000DAC  1                   ; load number of levels, pointed to by ZP_PTR_1,0
+000DAC  1  A0 00            ldy #0
+000DAE  1  B1 00            lda (ZP_PTR_1),y
+000DB0  1  8D F1 08         sta no_levels
+000DB3  1               
+000DB3  1                   ; start at first level HEADER
+000DB3  1  A9 B2            lda #<LOADSTART
+000DB5  1  18               clc
+000DB6  1  69 02            adc #2
+000DB8  1  85 00            sta ZP_PTR_1
+000DBA  1  A9 38            lda #>LOADSTART
+000DBC  1  85 01            sta ZP_PTR_1+1
+000DBE  1               
+000DBE  1               ; iterate through each header and add the level's size to the temp variable
+000DBE  1               @nextlevel:
+000DBE  1                   ; go to width variable
+000DBE  1  A0 02            ldy #2
+000DC0  1                   ; store width variable to fieldwidth - this is a 8-bit variable, so no high byte needed
+000DC0  1  B1 00            lda (ZP_PTR_1),y
+000DC2  1  8D F4 08         sta fieldwidth
+000DC5  1                   ; go to height variable
+000DC5  1  C8               iny
+000DC6  1  C8               iny
+000DC7  1  B1 00            lda (ZP_PTR_1),y
+000DC9  1  AA               tax ; loop counter
+000DCA  1               
+000DCA  1               @multiply:
+000DCA  1                   ; add fieldwidth variable to temp at each interation - temp = temp + (width * height)
+000DCA  1  A5 30            lda temp
+000DCC  1  18               clc
+000DCD  1  6D F4 08         adc fieldwidth
+000DD0  1  85 30            sta temp
+000DD2  1  A5 31            lda temp+1 ; don't forget the high byte
+000DD4  1  69 00            adc #0
+000DD6  1  85 31            sta temp+1
+000DD8  1  CA               dex
+000DD9  1  D0 EF            bne @multiply
+000DDB  1               
+000DDB  1                   ; add HEADER size for this level to temp
+000DDB  1  A5 30            lda temp
+000DDD  1  18               clc
+000DDE  1  69 0A            adc #LEVELHEADER
+000DE0  1  85 30            sta temp
+000DE2  1  A5 31            lda temp+1
+000DE4  1  69 00            adc #0
+000DE6  1  85 31            sta temp+1
+000DE8  1               
+000DE8  1                   ; next level?
+000DE8  1  CE F1 08         dec no_levels
+000DEB  1  F0 0F            beq @copydata
+000DED  1               
+000DED  1                   ; next header
+000DED  1  18               clc
+000DEE  1  A5 00            lda ZP_PTR_1
+000DF0  1  69 0A            adc #10
+000DF2  1  85 00            sta ZP_PTR_1
+000DF4  1  A5 01            lda ZP_PTR_1+1
+000DF6  1  69 00            adc #0
+000DF8  1  85 01            sta ZP_PTR_1+1
+000DFA  1               
+000DFA  1  80 C2            bra @nextlevel
+000DFC  1               @copydata:
+000DFC  1                   ; copy (temp) amount of bytes from LOADSTART to Ram bank 0
+000DFC  1               
+000DFC  1                   ; set up source pointer
+000DFC  1  A9 B2            lda #<LOADSTART
+000DFE  1  85 00            sta ZP_PTR_1
+000E00  1  A9 38            lda #>LOADSTART
+000E02  1  85 01            sta ZP_PTR_1+1
+000E04  1               
+000E04  1                   ; set up destination pointer
+000E04  1  A9 00            lda #<RAMBANK
+000E06  1  85 22            sta ZP_PTR_2
+000E08  1  A9 A0            lda #>RAMBANK
+000E0A  1  85 23            sta ZP_PTR_2+1
+000E0C  1               
+000E0C  1  A0 00            ldy #0
+000E0E  1               @copybyte:
+000E0E  1                   ; copy one byte of data
+000E0E  1  B1 00            lda (ZP_PTR_1),y
+000E10  1  91 22            sta (ZP_PTR_2),y
+000E12  1               
+000E12  1                   ; temp = temp -1
+000E12  1  A5 30            lda temp
+000E14  1  38               sec
+000E15  1  E9 01            sbc #1
+000E17  1  85 30            sta temp
+000E19  1  A5 31            lda temp+1
+000E1B  1  E9 00            sbc #0
+000E1D  1  85 31            sta temp+1
+000E1F  1               
+000E1F  1                   ; if temp==0 done
+000E1F  1  A5 31            lda temp+1
+000E21  1  D0 06            bne @copynextbyte
+000E23  1  A5 30            lda temp
+000E25  1  D0 02            bne @copynextbyte
+000E27  1  80 1C            bra @done
+000E29  1               @copynextbyte:
+000E29  1  A5 00            lda ZP_PTR_1
+000E2B  1  18               clc
+000E2C  1  69 01            adc #1
+000E2E  1  85 00            sta ZP_PTR_1
+000E30  1  A5 01            lda ZP_PTR_1+1
+000E32  1  69 00            adc #0
+000E34  1  85 01            sta ZP_PTR_1+1
+000E36  1  A5 22            lda ZP_PTR_2
+000E38  1  18               clc
+000E39  1  69 01            adc #1
+000E3B  1  85 22            sta ZP_PTR_2
+000E3D  1  A5 23            lda ZP_PTR_2+1
+000E3F  1  69 00            adc #0
+000E41  1  85 23            sta ZP_PTR_2+1
+000E43  1  80 C9            bra @copybyte
+000E45  1               @done:
+000E45  1  60               rts
+000E46  1               
+000E46  1               
+000E46  1               initfield:
+000E46  1                   ; load field pointer to first address at LOADSTART
+000E46  1                   ; load 1st pointer to temp pointer ZP_PTR_1
+000E46  1  A9 B2            lda #<LOADSTART
+000E48  1  85 00            sta ZP_PTR_1
+000E4A  1  A9 38            lda #>LOADSTART
+000E4C  1  85 01            sta ZP_PTR_1+1
+000E4E  1               
+000E4E  1                   ; skip to the first header, two bytes next
+000E4E  1  18               clc
+000E4F  1  A5 00            lda ZP_PTR_1
+000E51  1  69 02            adc #2
+000E53  1  85 00            sta ZP_PTR_1
+000E55  1               
+000E55  1                   ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
+000E55  1  AD F0 08         lda currentlevel
+000E58  1  AA               tax ; x contains the currentlevel now and will act as a counter
+000E59  1               @loop:
+000E59  1  CA               dex
+000E5A  1  F0 11            beq @fieldptrdone
+000E5C  1                   ; advance the field payload pointer
+000E5C  1  A5 00            lda ZP_PTR_1
+000E5E  1  18               clc
+000E5F  1  69 0A            adc #LEVELHEADER
+000E61  1  85 00            sta ZP_PTR_1
+000E63  1  90 F4            bcc @loop   ; nothing to do for the high byte
+000E65  1  A5 01            lda ZP_PTR_1+1
+000E67  1  69 00            adc #$0     ; increase the high byte
+000E69  1  85 01            sta ZP_PTR_1+1
+000E6B  1  80 EC            bra @loop
+000E6D  1               @fieldptrdone:
+000E6D  1               
+000E6D  1  A0 02            ldy #2  ; index from payload pointer to width variable (low byte)
+000E6F  1  B1 00            lda (ZP_PTR_1),y
+000E71  1  8D F4 08         sta fieldwidth
+000E74  1  A0 04            ldy #4  ; index from payload pointer to height variable (low byte)
+000E76  1  B1 00            lda (ZP_PTR_1),y
+000E78  1  8D F5 08         sta fieldheight
+000E7B  1  A0 06            ldy #6  ; index from payload pointer to goals in this level (low byte)
+000E7D  1  B1 00            lda (ZP_PTR_1),y
+000E7F  1  8D F2 08         sta no_goals
+000E82  1  A0 08            ldy #8  ; index from payload pointer to player offset in this level
+000E84  1               
+000E84  1  B1 00            lda (ZP_PTR_1),y
+000E86  1  18               clc
+000E87  1  69 00            adc #<RAMBANK
+000E89  1  85 24            sta ZP_PTR_3
+000E8B  1  C8               iny
+000E8C  1  B1 00            lda (ZP_PTR_1),y
+000E8E  1  69 A0            adc #>RAMBANK
+000E90  1  85 25            sta ZP_PTR_3+1
+000E92  1                   ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
+000E92  1               
+000E92  1                   ; now copy the field data to the RAM bank
+000E92  1  AD F5 08         lda fieldheight
+000E95  1  AA               tax ; create counter
+000E96  1                   ; clear temp counter
+000E96  1  64 30            stz temp
+000E98  1  64 31            stz temp+1
+000E9A  1               
+000E9A  1               @multiply:
+000E9A  1                   ; add fieldwidth variable to temp at each iteration - temp = temp + (width * height)
+000E9A  1  A5 30            lda temp
+000E9C  1  18               clc
+000E9D  1  6D F4 08         adc fieldwidth
+000EA0  1  85 30            sta temp
+000EA2  1  A5 31            lda temp+1 ; don't forget the high byte
+000EA4  1  69 00            adc #0
+000EA6  1  85 31            sta temp+1
+000EA8  1  CA               dex
+000EA9  1  D0 EF            bne @multiply
+000EAB  1               
+000EAB  1                   ; copy (temp) amount of bytes from current field pointer to Ram bank 0
+000EAB  1               
+000EAB  1                   ; currently ZP_PTR_1 is pointing to the selected field HEADER
+000EAB  1                   ; retrieve the field pointer from it, and let ZP_PTR_FIELD to that
+000EAB  1  A0 00            ldy #0
+000EAD  1  B1 00            lda (ZP_PTR_1),y
+000EAF  1  85 28            sta ZP_PTR_FIELD
+000EB1  1  C8               iny
+000EB2  1  B1 00            lda (ZP_PTR_1),y
+000EB4  1  85 29            sta ZP_PTR_FIELD+1
+000EB6  1                   ; now let this pointer start counting from LOADSTART, just as the offset in the input file references
+000EB6  1  A5 28            lda ZP_PTR_FIELD
+000EB8  1  18               clc
+000EB9  1  69 B2            adc #<LOADSTART
+000EBB  1  85 28            sta ZP_PTR_FIELD
+000EBD  1  A5 29            lda ZP_PTR_FIELD+1
+000EBF  1  69 38            adc #>LOADSTART
+000EC1  1  85 29            sta ZP_PTR_FIELD+1
+000EC3  1               
+000EC3  1                   ; set up destination pointer
+000EC3  1  A9 00            lda #<RAMBANK
+000EC5  1  85 22            sta ZP_PTR_2
+000EC7  1  A9 A0            lda #>RAMBANK
+000EC9  1  85 23            sta ZP_PTR_2+1
+000ECB  1               
+000ECB  1  A0 00            ldy #0
+000ECD  1               @copybyte:
+000ECD  1                   ; copy one byte of data
+000ECD  1  B1 28            lda (ZP_PTR_FIELD),y
+000ECF  1  91 22            sta (ZP_PTR_2),y
+000ED1  1               
+000ED1  1                   ; temp = temp -1
+000ED1  1  A5 30            lda temp
+000ED3  1  38               sec
+000ED4  1  E9 01            sbc #1
+000ED6  1  85 30            sta temp
+000ED8  1  A5 31            lda temp+1
+000EDA  1  E9 00            sbc #0
+000EDC  1  85 31            sta temp+1
+000EDE  1               
+000EDE  1                   ; if temp==0 done
+000EDE  1  A5 31            lda temp+1
+000EE0  1  D0 06            bne @copynextbyte
+000EE2  1  A5 30            lda temp
+000EE4  1  D0 02            bne @copynextbyte
+000EE6  1  80 1C            bra @done
+000EE8  1               @copynextbyte:
+000EE8  1  A5 28            lda ZP_PTR_FIELD
+000EEA  1  18               clc
+000EEB  1  69 01            adc #1
+000EED  1  85 28            sta ZP_PTR_FIELD
+000EEF  1  A5 29            lda ZP_PTR_FIELD+1
+000EF1  1  69 00            adc #0
+000EF3  1  85 29            sta ZP_PTR_FIELD+1
+000EF5  1  A5 22            lda ZP_PTR_2
+000EF7  1  18               clc
+000EF8  1  69 01            adc #1
+000EFA  1  85 22            sta ZP_PTR_2
+000EFC  1  A5 23            lda ZP_PTR_2+1
+000EFE  1  69 00            adc #0
+000F00  1  85 23            sta ZP_PTR_2+1
+000F02  1  80 C9            bra @copybyte
+000F04  1               @done:
 000F04  1               
-000F04  1               loadtiles:
-000F04  1               ; Build  16x16 256 color tiles in VRAM location $12000
-000F04  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000F07  1  A9 11            lda #$11
-000F09  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
-000F0C  1  A9 20            lda #$20
-000F0E  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $20
-000F11  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
-000F14  1               
-000F14  1  A2 00            ldx #0
-000F16  1  BD 29 32     :   lda tiledata,x                      ; index 0 / black tile
-000F19  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F1C  1  E8               inx
-000F1D  1  D0 F7            bne :-
-000F1F  1                   ; load Brick data
-000F1F  1  A2 00            ldx #0
-000F21  1  BD 29 33     :   lda Brick,x                         ; index 1 / brick
-000F24  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F27  1  E8               inx
-000F28  1  D0 F7            bne :-
-000F2A  1                   ; load player data
-000F2A  1  A2 00            ldx #0
-000F2C  1  BD 29 34     :   lda player,x                        ; index 2 / player
-000F2F  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F32  1  E8               inx
-000F33  1  D0 F7            bne :-
-000F35  1                   ; load crate data
-000F35  1  A2 00            ldx #0
-000F37  1  BD 29 35     :   lda crate,x                         ; index 3 / crate (normal)
-000F3A  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F3D  1  E8               inx
-000F3E  1  D0 F7            bne :-
-000F40  1                   ; load goal data
-000F40  1  A2 00            ldx #0
-000F42  1  BD 29 36     :   lda goal,x                         ; index 4 / goal (normal)
-000F45  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F48  1  E8               inx
-000F49  1  D0 F7            bne :-
-000F4B  1                   ; load crateongoal data
-000F4B  1  A2 00            ldx #0
-000F4D  1  BD 29 37     :   lda crateongoal,x                   ; index 5 / crate on goal
-000F50  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F53  1  E8               inx
-000F54  1  D0 F7            bne :-
-000F56  1               
-000F56  1  60               rts
-000F57  1               
-000F57  1               displaytitlescreen:
-000F57  1  A9 29            lda #<titlescreen
-000F59  1  85 00            sta ZP_PTR_1
-000F5B  1  A9 12            lda #>titlescreen
-000F5D  1  85 01            sta ZP_PTR_1+1
-000F5F  1  20 AC 0F         jsr displaytileset
-000F62  1               
-000F62  1  20 E2 0F         jsr displayhelp
-000F65  1               
-000F65  1  60               rts
-000F66  1               
-000F66  1               displaymessagescreen:
-000F66  1                   ; temp store pointer to the requested text
-000F66  1  A5 00            lda ZP_PTR_1
-000F68  1  48               pha
-000F69  1  A5 01            lda ZP_PTR_1+1
-000F6B  1  48               pha
-000F6C  1               
-000F6C  1  A9 29            lda #<messagescreen
-000F6E  1  85 00            sta ZP_PTR_1
-000F70  1  A9 22            lda #>messagescreen
-000F72  1  85 01            sta ZP_PTR_1+1
-000F74  1  20 AC 0F         jsr displaytileset
-000F77  1               
-000F77  1                   ; now display the string at ZP_PTR_1 in the middle and return
-000F77  1  68               pla
-000F78  1  85 01            sta ZP_PTR_1+1
-000F7A  1  68               pla
-000F7B  1  85 00            sta ZP_PTR_1
-000F7D  1  9C 25 9F         stz VERA_CTRL
-000F80  1                   ;lda #%00100000
-000F80  1  A9 10            lda #$10
-000F82  1  8D 22 9F         sta VERA_HIGH
-000F85  1  A9 1C            lda #28
-000F87  1  8D 21 9F         sta VERA_MID
-000F8A  1  A9 38            lda #28*2
-000F8C  1  8D 20 9F         sta VERA_LOW
-000F8F  1  A2 09            ldx #$9 ; color brown
-000F91  1  20 95 0F         jsr printverastring
-000F94  1  60               rts
-000F95  1               
-000F95  1               printverastring:
-000F95  1                   ; ZP_PTR_1 is pointing to the string
-000F95  1                   ; x contains color of the text
-000F95  1  A0 00            ldy #0
-000F97  1               @loop:
-000F97  1  B1 00            lda (ZP_PTR_1),y
-000F99  1  F0 10            beq @end
-000F9B  1  C9 40            cmp #$40
-000F9D  1  90 03            bcc @output
-000F9F  1               @AZ:
-000F9F  1  38               sec
-000FA0  1  E9 40            sbc #$40
-000FA2  1               @output:
-000FA2  1  8D 23 9F         sta VERA_DATA0
-000FA5  1  8E 23 9F         stx VERA_DATA0
-000FA8  1  C8               iny
-000FA9  1  80 EC            bra @loop
-000FAB  1               @end:
-000FAB  1  60               rts
-000FAC  1               
-000FAC  1               displaytileset:
-000FAC  1               ; Fill the Layer 0 with the tileset pointed to by ZP_PTR_1
-000FAC  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000FAF  1  A9 10            lda #$10
-000FB1  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000FB4  1  A9 40            lda #$40
-000FB6  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-000FB9  1  A9 00            lda #$0
-000FBB  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-000FBE  1               
-000FBE  1  A0 40            ldy #64
-000FC0  1               @outerloop:
-000FC0  1  A2 40            ldx #64
-000FC2  1               @innerloop:
-000FC2  1  5A               phy
-000FC3  1  A0 00            ldy #0
-000FC5  1  B1 00            lda (ZP_PTR_1),y                    ; load byte from tileset
-000FC7  1  8D 23 9F         sta VERA_DATA0
-000FCA  1  9C 23 9F         stz VERA_DATA0                      ; zero it's attribute
-000FCD  1  7A               ply
-000FCE  1               
-000FCE  1                   ; increase pointer to next byte in the set
-000FCE  1  A5 00            lda ZP_PTR_1
-000FD0  1  18               clc
-000FD1  1  69 02            adc #$2
-000FD3  1  85 00            sta ZP_PTR_1
-000FD5  1  A5 01            lda ZP_PTR_1+1
-000FD7  1  69 00            adc #$0
-000FD9  1  85 01            sta ZP_PTR_1+1
-000FDB  1               
-000FDB  1  CA               dex
-000FDC  1  D0 E4            bne @innerloop
-000FDE  1  88               dey
-000FDF  1  D0 DF            bne @outerloop
-000FE1  1               
-000FE1  1  60               rts
-000FE2  1               
-000FE2  1               displayhelp:
-000FE2  1  9C 25 9F         stz VERA_CTRL
-000FE5  1  A2 09            ldx #$9 ; color brown
-000FE7  1  A9 10            lda #$10
-000FE9  1  8D 22 9F         sta VERA_HIGH
-000FEC  1               
-000FEC  1  A9 67            lda #<help0
-000FEE  1  85 00            sta ZP_PTR_1
-000FF0  1  A9 08            lda #>help0
-000FF2  1  85 01            sta ZP_PTR_1+1
-000FF4  1  A9 17            lda #23
-000FF6  1  8D 21 9F         sta VERA_MID
-000FF9  1  A9 64            lda #50*2
-000FFB  1  8D 20 9F         sta VERA_LOW
-000FFE  1  20 95 0F         jsr printverastring
-001001  1               
-001001  1  A9 75            lda #<help1
-001003  1  85 00            sta ZP_PTR_1
-001005  1  A9 08            lda #>help1
-001007  1  85 01            sta ZP_PTR_1+1
-001009  1  A9 1E            lda #30
-00100B  1  8D 21 9F         sta VERA_MID
-00100E  1  A9 64            lda #50*2
-001010  1  8D 20 9F         sta VERA_LOW
-001013  1  20 95 0F         jsr printverastring
-001016  1               
-001016  1  A9 89            lda #<help2
-001018  1  85 00            sta ZP_PTR_1
-00101A  1  A9 08            lda #>help2
-00101C  1  85 01            sta ZP_PTR_1+1
-00101E  1  A9 20            lda #32
-001020  1  8D 21 9F         sta VERA_MID
-001023  1  A9 64            lda #50*2
-001025  1  8D 20 9F         sta VERA_LOW
-001028  1  20 95 0F         jsr printverastring
-00102B  1               
-00102B  1  A9 9F            lda #<help3
-00102D  1  85 00            sta ZP_PTR_1
-00102F  1  A9 08            lda #>help3
-001031  1  85 01            sta ZP_PTR_1+1
-001033  1  A9 21            lda #33
-001035  1  8D 21 9F         sta VERA_MID
-001038  1  A9 64            lda #50*2
-00103A  1  8D 20 9F         sta VERA_LOW
-00103D  1  20 95 0F         jsr printverastring
-001040  1               
-001040  1  A9 AD            lda #<help4
-001042  1  85 00            sta ZP_PTR_1
-001044  1  A9 08            lda #>help4
-001046  1  85 01            sta ZP_PTR_1+1
-001048  1  A9 22            lda #34
-00104A  1  8D 21 9F         sta VERA_MID
-00104D  1  A9 64            lda #50*2
-00104F  1  8D 20 9F         sta VERA_LOW
-001052  1  20 95 0F         jsr printverastring
+000F04  1                   ; prep the field pointer
+000F04  1  A9 00            lda #<RAMBANK
+000F06  1  85 28            sta ZP_PTR_FIELD
+000F08  1  A9 A0            lda #>RAMBANK
+000F0A  1  85 29            sta ZP_PTR_FIELD+1
+000F0C  1  60               rts
+000F0D  1               
+000F0D  1               printfield:
+000F0D  1                   ; console routines only
+000F0D  1                   ; no clearscreen, just print the field to screen on current position
+000F0D  1                   ; depends only on
+000F0D  1                   ; - field label for start of field
+000F0D  1               
+000F0D  1  A5 28            lda ZP_PTR_FIELD
+000F0F  1  85 00            sta ZP_PTR_1
+000F11  1  A5 29            lda ZP_PTR_FIELD+1
+000F13  1  85 01            sta ZP_PTR_1+1
+000F15  1  A2 00            ldx #0 ; row counter
+000F17  1               @nextrow:
+000F17  1  A0 00            ldy #0 ; column counter
+000F19  1               @row:
+000F19  1  B1 00            lda (ZP_PTR_1),y
+000F1B  1  C9 40            cmp #'@'
+000F1D  1  F0 06            beq @character
+000F1F  1  C9 2B            cmp #'+'
+000F21  1  F0 02            beq @character
+000F23  1  80 17            bra @normalcolor
+000F25  1               @character:
+000F25  1  48               pha
+000F26  1  A9 9E            lda #$9e ; YELLOW
+000F28  1  20 D2 FF         jsr CHROUT
+000F2B  1  68               pla
+000F2C  1  20 D2 FF         jsr CHROUT
+000F2F  1  A9 05            lda #$05 ; WHITE
+000F31  1  20 D2 FF         jsr CHROUT
+000F34  1  C8               iny
+000F35  1  CC F4 08         cpy fieldwidth
+000F38  1  D0 DF            bne @row
+000F3A  1  80 09            bra @endline
+000F3C  1               @normalcolor:
+000F3C  1  20 D2 FF         jsr CHROUT
+000F3F  1  C8               iny
+000F40  1  CC F4 08         cpy fieldwidth
+000F43  1  D0 D4            bne @row
+000F45  1               @endline:
+000F45  1  A9 0D            lda #NEWLINE
+000F47  1  20 D2 FF         jsr CHROUT
+000F4A  1               
+000F4A  1                   ; advance pointer to next row
+000F4A  1  A5 00            lda ZP_PTR_1
+000F4C  1  18               clc
+000F4D  1  6D F4 08         adc fieldwidth
+000F50  1  85 00            sta ZP_PTR_1
+000F52  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
+000F54  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+000F56  1  18               clc
+000F57  1  69 01            adc #1
+000F59  1  85 01            sta ZP_PTR_1+1
+000F5B  1               @checklastrow:
+000F5B  1                   ; last row?
+000F5B  1  E8               inx
+000F5C  1  EC F5 08         cpx fieldheight
+000F5F  1  D0 B6            bne @nextrow
+000F61  1               
+000F61  1                   ; print quit message at the end of the field
+000F61  1  A9 0D            lda #NEWLINE
+000F63  1  20 D2 FF         jsr CHROUT
+000F66  1  A9 50            lda #<quitmessage
+000F68  1  85 00            sta ZP_PTR_1
+000F6A  1  A9 08            lda #>quitmessage
+000F6C  1  85 01            sta ZP_PTR_1+1
+000F6E  1  20 B5 0C         jsr printline
+000F71  1               
+000F71  1  60               rts
+000F72  1               
+000F72  1               cls:
+000F72  1  A9 93            lda #CLEARSCREEN
+000F74  1  20 D2 FF         jsr CHROUT
+000F77  1  60               rts
+000F78  1               
+000F78  1               loadtiles:
+000F78  1               ; Build  16x16 256 color tiles in VRAM location $12000
+000F78  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+000F7B  1  A9 11            lda #$11
+000F7D  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
+000F80  1  A9 20            lda #$20
+000F82  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $20
+000F85  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
+000F88  1               
+000F88  1  A2 00            ldx #0
+000F8A  1  BD B2 32     :   lda tiledata,x                      ; index 0 / black tile
+000F8D  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F90  1  E8               inx
+000F91  1  D0 F7            bne :-
+000F93  1                   ; load Brick data
+000F93  1  A2 00            ldx #0
+000F95  1  BD B2 33     :   lda Brick,x                         ; index 1 / brick
+000F98  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F9B  1  E8               inx
+000F9C  1  D0 F7            bne :-
+000F9E  1                   ; load player data
+000F9E  1  A2 00            ldx #0
+000FA0  1  BD B2 34     :   lda player,x                        ; index 2 / player
+000FA3  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000FA6  1  E8               inx
+000FA7  1  D0 F7            bne :-
+000FA9  1                   ; load crate data
+000FA9  1  A2 00            ldx #0
+000FAB  1  BD B2 35     :   lda crate,x                         ; index 3 / crate (normal)
+000FAE  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000FB1  1  E8               inx
+000FB2  1  D0 F7            bne :-
+000FB4  1                   ; load goal data
+000FB4  1  A2 00            ldx #0
+000FB6  1  BD B2 36     :   lda goal,x                         ; index 4 / goal (normal)
+000FB9  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000FBC  1  E8               inx
+000FBD  1  D0 F7            bne :-
+000FBF  1                   ; load crateongoal data
+000FBF  1  A2 00            ldx #0
+000FC1  1  BD B2 37     :   lda crateongoal,x                   ; index 5 / crate on goal
+000FC4  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000FC7  1  E8               inx
+000FC8  1  D0 F7            bne :-
+000FCA  1               
+000FCA  1  60               rts
+000FCB  1               
+000FCB  1               displaytitlescreen:
+000FCB  1  A9 B2            lda #<titlescreen
+000FCD  1  85 00            sta ZP_PTR_1
+000FCF  1  A9 12            lda #>titlescreen
+000FD1  1  85 01            sta ZP_PTR_1+1
+000FD3  1  20 20 10         jsr displaytileset
+000FD6  1               
+000FD6  1  20 56 10         jsr displayhelp
+000FD9  1               
+000FD9  1  60               rts
+000FDA  1               
+000FDA  1               displaymessagescreen:
+000FDA  1                   ; temp store pointer to the requested text
+000FDA  1  A5 00            lda ZP_PTR_1
+000FDC  1  48               pha
+000FDD  1  A5 01            lda ZP_PTR_1+1
+000FDF  1  48               pha
+000FE0  1               
+000FE0  1  A9 B2            lda #<messagescreen
+000FE2  1  85 00            sta ZP_PTR_1
+000FE4  1  A9 22            lda #>messagescreen
+000FE6  1  85 01            sta ZP_PTR_1+1
+000FE8  1  20 20 10         jsr displaytileset
+000FEB  1               
+000FEB  1                   ; now display the string at ZP_PTR_1 in the middle and return
+000FEB  1  68               pla
+000FEC  1  85 01            sta ZP_PTR_1+1
+000FEE  1  68               pla
+000FEF  1  85 00            sta ZP_PTR_1
+000FF1  1  9C 25 9F         stz VERA_CTRL
+000FF4  1                   ;lda #%00100000
+000FF4  1  A9 10            lda #$10
+000FF6  1  8D 22 9F         sta VERA_HIGH
+000FF9  1  A9 1C            lda #28
+000FFB  1  8D 21 9F         sta VERA_MID
+000FFE  1  A9 38            lda #28*2
+001000  1  8D 20 9F         sta VERA_LOW
+001003  1  A2 09            ldx #$9 ; color brown
+001005  1  20 09 10         jsr printverastring
+001008  1  60               rts
+001009  1               
+001009  1               printverastring:
+001009  1                   ; ZP_PTR_1 is pointing to the string
+001009  1                   ; x contains color of the text
+001009  1  A0 00            ldy #0
+00100B  1               @loop:
+00100B  1  B1 00            lda (ZP_PTR_1),y
+00100D  1  F0 10            beq @end
+00100F  1  C9 40            cmp #$40
+001011  1  90 03            bcc @output
+001013  1               @AZ:
+001013  1  38               sec
+001014  1  E9 40            sbc #$40
+001016  1               @output:
+001016  1  8D 23 9F         sta VERA_DATA0
+001019  1  8E 23 9F         stx VERA_DATA0
+00101C  1  C8               iny
+00101D  1  80 EC            bra @loop
+00101F  1               @end:
+00101F  1  60               rts
+001020  1               
+001020  1               displaytileset:
+001020  1               ; Fill the Layer 0 with the tileset pointed to by ZP_PTR_1
+001020  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+001023  1  A9 10            lda #$10
+001025  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+001028  1  A9 40            lda #$40
+00102A  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+00102D  1  A9 00            lda #$0
+00102F  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+001032  1               
+001032  1  A0 40            ldy #64
+001034  1               @outerloop:
+001034  1  A2 40            ldx #64
+001036  1               @innerloop:
+001036  1  5A               phy
+001037  1  A0 00            ldy #0
+001039  1  B1 00            lda (ZP_PTR_1),y                    ; load byte from tileset
+00103B  1  8D 23 9F         sta VERA_DATA0
+00103E  1  9C 23 9F         stz VERA_DATA0                      ; zero it's attribute
+001041  1  7A               ply
+001042  1               
+001042  1                   ; increase pointer to next byte in the set
+001042  1  A5 00            lda ZP_PTR_1
+001044  1  18               clc
+001045  1  69 02            adc #$2
+001047  1  85 00            sta ZP_PTR_1
+001049  1  A5 01            lda ZP_PTR_1+1
+00104B  1  69 00            adc #$0
+00104D  1  85 01            sta ZP_PTR_1+1
+00104F  1               
+00104F  1  CA               dex
+001050  1  D0 E4            bne @innerloop
+001052  1  88               dey
+001053  1  D0 DF            bne @outerloop
 001055  1               
 001055  1  60               rts
 001056  1               
-001056  1               cleartiles:
-001056  1               ; Fill the Layer 0 with all zeros (black)
-001056  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-001059  1  A9 10            lda #$10
-00105B  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-00105E  1  A9 40            lda #$40
-001060  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-001063  1  A9 00            lda #$0
-001065  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-001068  1               
-001068  1  A9 00            lda #0
-00106A  1  8D 23 9F         sta VERA_DATA0
-00106D  1  8D 23 9F         sta VERA_DATA0
-001070  1               
-001070  1  A0 40            ldy #64
-001072  1  A9 00            lda #0
-001074  1  A2 40        :   ldx #64
-001076  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-001079  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
-00107C  1  CA               dex
-00107D  1  D0 F7            bne :-
-00107F  1  88               dey
-001080  1  D0 F2            bne :--
-001082  1               
-001082  1  60               rts
-001083  1               
-001083  1               resetlayerconfig:
-001083  1               ; Change Layer 1 to 8 Color Mode
-001083  1  AD 34 9F         lda $9F34
-001086  1  29 F7            and #%11110111                        ; Set bit 3 to 0, rest unchanged
-001088  1  8D 34 9F         sta $9F34
-00108B  1               
-00108B  1  20 FE 0E         jsr cls
-00108E  1  60               rts
-00108F  1               
-00108F  1               layerconfig:
-00108F  1               ; Configure Layer 0
-00108F  1  A9 53            lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
-001091  1  8D 2D 9F         sta $9F2D
-001094  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
-001096  1  8D 2E 9F         sta $9F2E                           ; Store to Map Base Pointer
-001099  1               
-001099  1  A9 93            lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
-00109B  1  8D 2F 9F         sta $9F2F                           ; Store to Tile Base Pointer
-00109E  1               
-00109E  1               ; Fill the Layer 0 with all zeros (black)
-00109E  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-0010A1  1  A9 10            lda #$10
-0010A3  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-0010A6  1  A9 40            lda #$40
-0010A8  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-0010AB  1  A9 00            lda #$0
-0010AD  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-0010B0  1               
-0010B0  1  A9 00            lda #0
-0010B2  1  8D 23 9F         sta VERA_DATA0
-0010B5  1  8D 23 9F         sta VERA_DATA0
-0010B8  1               
-0010B8  1  A0 40            ldy #64
-0010BA  1  A9 00            lda #0
-0010BC  1  A2 40        :   ldx #64
-0010BE  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-0010C1  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
-0010C4  1  CA               dex
-0010C5  1  D0 F7            bne :-
-0010C7  1  88               dey
-0010C8  1  D0 F2            bne :--
-0010CA  1               
-0010CA  1               ; Turn on Layer 0
-0010CA  1  AD 29 9F         lda $9F29
-0010CD  1  09 30            ora #%00110000                      ; Bits 4 and 5 are set to 1
-0010CF  1  8D 29 9F         sta $9F29                           ; So both Later 0 and 1 are turned on
-0010D2  1               
-0010D2  1               ; Change Layer 1 to 256 Color Mode
-0010D2  1  AD 34 9F         lda $9F34
-0010D5  1  09 08            ora #%001000                        ; Set bit 3 to 1, rest unchanged
-0010D7  1  8D 34 9F         sta $9F34
-0010DA  1               
-0010DA  1               ; Clear Layer 1
-0010DA  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-0010DD  1  A9 10            lda #$10
-0010DF  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-0010E2  1  9C 21 9F         stz VERA_MID                        ; Set Middle Byte to $00
-0010E5  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
-0010E8  1               
-0010E8  1  A9 1E            lda #30
-0010EA  1  85 02            sta $02                             ; save counter for rows
-0010EC  1  A0 01            ldy #$01                            ; Color Attribute white on black background
-0010EE  1  A9 20            lda #$20                            ; Blank character
-0010F0  1  A2 00            ldx #0
-0010F2  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-0010F5  1  8C 23 9F         sty VERA_DATA0                      ; Write Attribute
-0010F8  1  E8               inx
-0010F9  1  D0 F7            bne :-
-0010FB  1  C6 02            dec $02
-0010FD  1  D0 F3            bne :-
-0010FF  1               
-0010FF  1               ; Scale Display x2 for resolution of 320 x 240 pixels
-0010FF  1               ;    lda #$40
-0010FF  1               ;    sta $9F2A
-0010FF  1               ;    sta $9F2B
-0010FF  1               
-0010FF  1  60               rts
-001100  1               
-001100  1               printfield2:
-001100  1               ; prep variables for vera med/high bytes
-001100  1               ;    topleft address for first tile is 0x04000
-001100  1  A9 40            lda #$40
-001102  1  8D C2 08         sta vera_byte_mid
-001105  1  9C C1 08         stz vera_byte_low
-001108  1               
-001108  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
-001108  1  A9 28            lda #SCREENWIDTH
-00110A  1  38               sec
-00110B  1  ED BF 08         sbc fieldwidth
-00110E  1  4A               lsr ; /2
-00110F  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
-001110  1  8D C1 08         sta vera_byte_low
-001113  1               
-001113  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
-001113  1  A9 1E            lda #SCREENHEIGHT
-001115  1  38               sec
-001116  1  ED C0 08         sbc fieldheight
-001119  1  4A               lsr ; /2
-00111A  1  AA               tax ; transfer number of rows down to counter
-00111B  1               @loop:
-00111B  1  E0 00            cpx #$0 ; any rows down (left)?
-00111D  1  F0 16            beq @done ; exit loop when x == 0
-00111F  1                   ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
-00111F  1  AD C1 08         lda vera_byte_low
-001122  1  18               clc
-001123  1  69 80            adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
-001125  1  8D C1 08         sta vera_byte_low
-001128  1  90 08            bcc @decrement  ; no need to change the high byte
-00112A  1  AD C2 08         lda vera_byte_mid
-00112D  1  69 00            adc #$0     ; add carry (so +1)
-00112F  1  8D C2 08         sta vera_byte_mid
-001132  1               @decrement: ; next row
-001132  1  CA               dex
-001133  1  80 E6            bra @loop
-001135  1               @done:
-001135  1               
-001135  1               ; prepare the pointers to the back-end field data, so we know what to display
-001135  1  A5 28            lda ZP_PTR_FIELD
-001137  1  85 00            sta ZP_PTR_1
-001139  1  A5 29            lda ZP_PTR_FIELD+1
-00113B  1  85 01            sta ZP_PTR_1+1
-00113D  1               
-00113D  1               ; start displaying the selected field
-00113D  1               ; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
-00113D  1  A2 00            ldx #0 ; row counter
-00113F  1               @nextrow:
-00113F  1  A0 00            ldy #0 ; column counter
-001141  1                   ; prepare vera pointers for this row
-001141  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-001144  1  A9 10            lda #$10
-001146  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-001149  1  AD C2 08         lda vera_byte_mid
-00114C  1  8D 21 9F         sta VERA_MID
-00114F  1  AD C1 08         lda vera_byte_low
-001152  1  8D 20 9F         sta VERA_LOW
-001155  1               
-001155  1               @row:
-001155  1                   ; sweep the field, row by row, indexed by column y
-001155  1  B1 00            lda (ZP_PTR_1),y
-001157  1  C9 40            cmp #'@'
-001159  1  F0 2A            beq @player
-00115B  1  C9 2B            cmp #'+'
-00115D  1  F0 26            beq @player
-00115F  1  C9 24            cmp #'$'
-001161  1  F0 32            beq @crate
-001163  1  C9 2E            cmp #'.'
-001165  1  F0 4E            beq @goal
-001167  1  C9 2A            cmp #'*'
-001169  1  F0 3A            beq @crateongoal
-00116B  1  C9 20            cmp #' '
-00116D  1  F0 06            beq @ignore
-00116F  1  C9 00            cmp #0
-001171  1  F0 02            beq @ignore
-001173  1  80 50            bra @wall
-001175  1               @ignore:
-001175  1                   ; ignore
-001175  1  A9 00            lda #$0 ; black tile
-001177  1  8D 23 9F         sta VERA_DATA0
-00117A  1  9C 23 9F         stz VERA_DATA0
-00117D  1  C8               iny
-00117E  1  CC BF 08         cpy fieldwidth
-001181  1  D0 D2            bne @row
-001183  1  80 4E            bra @endline
-001185  1               @player:
-001185  1  A9 02            lda #$2
-001187  1  8D 23 9F         sta VERA_DATA0
-00118A  1  9C 23 9F         stz VERA_DATA0
-00118D  1  C8               iny
-00118E  1  CC BF 08         cpy fieldwidth
-001191  1  D0 C2            bne @row
-001193  1  80 3E            bra @endline
-001195  1               @crate:
-001195  1  A9 03            lda #$3
-001197  1  8D 23 9F         sta VERA_DATA0
-00119A  1  9C 23 9F         stz VERA_DATA0
-00119D  1  C8               iny
-00119E  1  CC BF 08         cpy fieldwidth
-0011A1  1  D0 B2            bne @row
-0011A3  1  80 2E            bra @endline
-0011A5  1               @crateongoal:
-0011A5  1  A9 05            lda #$5
-0011A7  1  8D 23 9F         sta VERA_DATA0
-0011AA  1  9C 23 9F         stz VERA_DATA0
-0011AD  1  C8               iny
-0011AE  1  CC BF 08         cpy fieldwidth
-0011B1  1  D0 A2            bne @row
-0011B3  1  80 1E            bra @endline
-0011B5  1               @goal:
-0011B5  1  A9 04            lda #$4
-0011B7  1  8D 23 9F         sta VERA_DATA0
-0011BA  1  9C 23 9F         stz VERA_DATA0
-0011BD  1  C8               iny
-0011BE  1  CC BF 08         cpy fieldwidth
-0011C1  1  D0 92            bne @row
-0011C3  1  80 0E            bra @endline
-0011C5  1               
-0011C5  1               @wall:
-0011C5  1  A9 01            lda #$1 ; load tile 1 ; brick
-0011C7  1  8D 23 9F         sta VERA_DATA0
-0011CA  1  9C 23 9F         stz VERA_DATA0
-0011CD  1               
-0011CD  1  C8               iny
-0011CE  1  CC BF 08         cpy fieldwidth
-0011D1  1  D0 82            bne @row
-0011D3  1               @endline:
-0011D3  1                   ; advance pointer to next row in the field
-0011D3  1  A5 00            lda ZP_PTR_1
-0011D5  1  18               clc
-0011D6  1  6D BF 08         adc fieldwidth
-0011D9  1  85 00            sta ZP_PTR_1
-0011DB  1  90 06            bcc @checklastrow ; no carry, don't increment high byte on pointer
-0011DD  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-0011DF  1  69 00            adc #0
-0011E1  1  85 01            sta ZP_PTR_1+1
-0011E3  1               @checklastrow:
-0011E3  1                   ; last row?
-0011E3  1                   ; increment vera pointer to next row
-0011E3  1  AD C1 08         lda vera_byte_low
-0011E6  1  18               clc
-0011E7  1  69 80            adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
-0011E9  1  8D C1 08         sta vera_byte_low
-0011EC  1  90 08            bcc @next3  ; no need to change the high byte
-0011EE  1  AD C2 08         lda vera_byte_mid
-0011F1  1  69 00            adc #$0     ; add carry (so +1)
-0011F3  1  8D C2 08         sta vera_byte_mid
-0011F6  1               @next3:
-0011F6  1  E8               inx
-0011F7  1  EC C0 08         cpx fieldheight
-0011FA  1  F0 03            beq @nextsection
-0011FC  1               
-0011FC  1  4C 3F 11         jmp @nextrow
-0011FF  1               @nextsection:
-0011FF  1  60               rts
-001200  1               
-001200  1               printdecimal2:
-001200  1                   ; on entry A = value to print to standard out
-001200  1  DA               phx
-001201  1  5A               phy
-001202  1  A2 FF            ldx #$ff
-001204  1  38               sec
-001205  1               @prdec100:
-001205  1  E8               inx
-001206  1  E9 64            sbc #100
-001208  1  B0 FB            bcs @prdec100
-00120A  1  69 64            adc #100
-00120C  1  20 1D 12         jsr @prdecdigit
-00120F  1  A2 FF            ldx #$ff
-001211  1  38               sec
-001212  1               @prdec10:
-001212  1  E8               inx
-001213  1  E9 0A            sbc #10
-001215  1  B0 FB            bcs @prdec10
-001217  1  69 0A            adc #10
-001219  1  20 1D 12         jsr @prdecdigit
-00121C  1  AA               tax
-00121D  1               @prdecdigit:
-00121D  1               ;    pha
-00121D  1  8A               txa
-00121E  1  09 30            ora #'0'
-001220  1               ;    jsr CHROUT
-001220  1               ;    pla
-001220  1  7A               ply
-001221  1  FA               plx
-001222  1  8D 23 9F         sta VERA_DATA0
-001225  1  8E 23 9F         stx VERA_DATA0
-001228  1  60               rts
-001229  1               
-001229  1               titlescreen:
-001229  1  00 00 01 00  .incbin "tiles/titlescreen.bin"
-00122D  1  01 00 01 00  
-001231  1  00 00 00 00  
-002229  1               messagescreen:
-002229  1  00 00 00 00  .incbin "tiles/messagescreen.bin"
-00222D  1  00 00 00 00  
-002231  1  00 00 00 00  
-003229  1               tiledata:
-003229  1               black:
-003229  1  00 00 00 00  .incbin "tiles/black.bin"
-00322D  1  00 00 00 00  
-003231  1  00 00 00 00  
-003329  1               Brick:
-003329  1  08 08 08 08  .incbin "tiles/brick.bin"
-00332D  1  08 08 08 E5  
-003331  1  08 08 08 08  
-003429  1               player:
-003429  1  00 00 00 00  .incbin "tiles/player.bin"
-00342D  1  00 10 10 10  
-003431  1  10 0B 00 00  
-003529  1               crate:
-003529  1  57 57 57 57  .incbin "tiles/crate.bin"
-00352D  1  57 57 57 57  
-003531  1  57 57 57 57  
-003629  1               goal:
-003629  1  00 00 00 00  .incbin "tiles/goal.bin"
-00362D  1  00 00 00 00  
-003631  1  00 00 00 00  
-003729  1               crateongoal:
-003729  1  57 57 57 57  .incbin "tiles/crateongoal.bin"
-00372D  1  57 57 57 57  
-003731  1  57 57 57 57  
-003829  1               LOADSTART:
-003829  1  02 00 16 00  .incbin "levels.bin"
-00382D  1  05 00 03 00  
-003831  1  01 00 06 00  
-003829  1               
+001056  1               displayhelp:
+001056  1  9C 25 9F         stz VERA_CTRL
+001059  1  A2 09            ldx #$9 ; color brown
+00105B  1  A9 10            lda #$10
+00105D  1  8D 22 9F         sta VERA_HIGH
+001060  1               
+001060  1  A9 7F            lda #<help0
+001062  1  85 00            sta ZP_PTR_1
+001064  1  A9 08            lda #>help0
+001066  1  85 01            sta ZP_PTR_1+1
+001068  1  A9 17            lda #23
+00106A  1  8D 21 9F         sta VERA_MID
+00106D  1  A9 64            lda #50*2
+00106F  1  8D 20 9F         sta VERA_LOW
+001072  1  20 09 10         jsr printverastring
+001075  1               
+001075  1  A9 8D            lda #<help1
+001077  1  85 00            sta ZP_PTR_1
+001079  1  A9 08            lda #>help1
+00107B  1  85 01            sta ZP_PTR_1+1
+00107D  1  A9 1E            lda #30
+00107F  1  8D 21 9F         sta VERA_MID
+001082  1  A9 64            lda #50*2
+001084  1  8D 20 9F         sta VERA_LOW
+001087  1  20 09 10         jsr printverastring
+00108A  1               
+00108A  1  A9 A1            lda #<help2
+00108C  1  85 00            sta ZP_PTR_1
+00108E  1  A9 08            lda #>help2
+001090  1  85 01            sta ZP_PTR_1+1
+001092  1  A9 20            lda #32
+001094  1  8D 21 9F         sta VERA_MID
+001097  1  A9 64            lda #50*2
+001099  1  8D 20 9F         sta VERA_LOW
+00109C  1  20 09 10         jsr printverastring
+00109F  1               
+00109F  1  A9 B7            lda #<help3
+0010A1  1  85 00            sta ZP_PTR_1
+0010A3  1  A9 08            lda #>help3
+0010A5  1  85 01            sta ZP_PTR_1+1
+0010A7  1  A9 21            lda #33
+0010A9  1  8D 21 9F         sta VERA_MID
+0010AC  1  A9 64            lda #50*2
+0010AE  1  8D 20 9F         sta VERA_LOW
+0010B1  1  20 09 10         jsr printverastring
+0010B4  1               
+0010B4  1  A9 C5            lda #<help4
+0010B6  1  85 00            sta ZP_PTR_1
+0010B8  1  A9 08            lda #>help4
+0010BA  1  85 01            sta ZP_PTR_1+1
+0010BC  1  A9 22            lda #34
+0010BE  1  8D 21 9F         sta VERA_MID
+0010C1  1  A9 64            lda #50*2
+0010C3  1  8D 20 9F         sta VERA_LOW
+0010C6  1  20 09 10         jsr printverastring
+0010C9  1               
+0010C9  1  A9 DB            lda #<help5
+0010CB  1  85 00            sta ZP_PTR_1
+0010CD  1  A9 08            lda #>help5
+0010CF  1  85 01            sta ZP_PTR_1+1
+0010D1  1  A9 23            lda #35
+0010D3  1  8D 21 9F         sta VERA_MID
+0010D6  1  A9 64            lda #50*2
+0010D8  1  8D 20 9F         sta VERA_LOW
+0010DB  1  20 09 10         jsr printverastring
+0010DE  1  60               rts
+0010DF  1               
+0010DF  1               cleartiles:
+0010DF  1               ; Fill the Layer 0 with all zeros (black)
+0010DF  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+0010E2  1  A9 10            lda #$10
+0010E4  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+0010E7  1  A9 40            lda #$40
+0010E9  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+0010EC  1  A9 00            lda #$0
+0010EE  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+0010F1  1               
+0010F1  1  A9 00            lda #0
+0010F3  1  8D 23 9F         sta VERA_DATA0
+0010F6  1  8D 23 9F         sta VERA_DATA0
+0010F9  1               
+0010F9  1  A0 40            ldy #64
+0010FB  1  A9 00            lda #0
+0010FD  1  A2 40        :   ldx #64
+0010FF  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+001102  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
+001105  1  CA               dex
+001106  1  D0 F7            bne :-
+001108  1  88               dey
+001109  1  D0 F2            bne :--
+00110B  1               
+00110B  1  60               rts
+00110C  1               
+00110C  1               resetlayerconfig:
+00110C  1               ; Change Layer 1 to 8 Color Mode
+00110C  1  AD 34 9F         lda $9F34
+00110F  1  29 F7            and #%11110111                        ; Set bit 3 to 0, rest unchanged
+001111  1  8D 34 9F         sta $9F34
+001114  1               
+001114  1  20 72 0F         jsr cls
+001117  1  60               rts
+001118  1               
+001118  1               layerconfig:
+001118  1               ; Configure Layer 0
+001118  1  A9 53            lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
+00111A  1  8D 2D 9F         sta $9F2D
+00111D  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
+00111F  1  8D 2E 9F         sta $9F2E                           ; Store to Map Base Pointer
+001122  1               
+001122  1  A9 93            lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
+001124  1  8D 2F 9F         sta $9F2F                           ; Store to Tile Base Pointer
+001127  1               
+001127  1               ; Fill the Layer 0 with all zeros (black)
+001127  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+00112A  1  A9 10            lda #$10
+00112C  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+00112F  1  A9 40            lda #$40
+001131  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+001134  1  A9 00            lda #$0
+001136  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+001139  1               
+001139  1  A9 00            lda #0
+00113B  1  8D 23 9F         sta VERA_DATA0
+00113E  1  8D 23 9F         sta VERA_DATA0
+001141  1               
+001141  1  A0 40            ldy #64
+001143  1  A9 00            lda #0
+001145  1  A2 40        :   ldx #64
+001147  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+00114A  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
+00114D  1  CA               dex
+00114E  1  D0 F7            bne :-
+001150  1  88               dey
+001151  1  D0 F2            bne :--
+001153  1               
+001153  1               ; Turn on Layer 0
+001153  1  AD 29 9F         lda $9F29
+001156  1  09 30            ora #%00110000                      ; Bits 4 and 5 are set to 1
+001158  1  8D 29 9F         sta $9F29                           ; So both Later 0 and 1 are turned on
+00115B  1               
+00115B  1               ; Change Layer 1 to 256 Color Mode
+00115B  1  AD 34 9F         lda $9F34
+00115E  1  09 08            ora #%001000                        ; Set bit 3 to 1, rest unchanged
+001160  1  8D 34 9F         sta $9F34
+001163  1               
+001163  1               ; Clear Layer 1
+001163  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+001166  1  A9 10            lda #$10
+001168  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+00116B  1  9C 21 9F         stz VERA_MID                        ; Set Middle Byte to $00
+00116E  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
+001171  1               
+001171  1  A9 1E            lda #30
+001173  1  85 02            sta $02                             ; save counter for rows
+001175  1  A0 01            ldy #$01                            ; Color Attribute white on black background
+001177  1  A9 20            lda #$20                            ; Blank character
+001179  1  A2 00            ldx #0
+00117B  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+00117E  1  8C 23 9F         sty VERA_DATA0                      ; Write Attribute
+001181  1  E8               inx
+001182  1  D0 F7            bne :-
+001184  1  C6 02            dec $02
+001186  1  D0 F3            bne :-
+001188  1               
+001188  1               ; Scale Display x2 for resolution of 320 x 240 pixels
+001188  1               ;    lda #$40
+001188  1               ;    sta $9F2A
+001188  1               ;    sta $9F2B
+001188  1               
+001188  1  60               rts
+001189  1               
+001189  1               printfield2:
+001189  1               ; prep variables for vera med/high bytes
+001189  1               ;    topleft address for first tile is 0x04000
+001189  1  A9 40            lda #$40
+00118B  1  8D F7 08         sta vera_byte_mid
+00118E  1  9C F6 08         stz vera_byte_low
+001191  1               
+001191  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
+001191  1  A9 28            lda #SCREENWIDTH
+001193  1  38               sec
+001194  1  ED F4 08         sbc fieldwidth
+001197  1  4A               lsr ; /2
+001198  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
+001199  1  8D F6 08         sta vera_byte_low
+00119C  1               
+00119C  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
+00119C  1  A9 1E            lda #SCREENHEIGHT
+00119E  1  38               sec
+00119F  1  ED F5 08         sbc fieldheight
+0011A2  1  4A               lsr ; /2
+0011A3  1  AA               tax ; transfer number of rows down to counter
+0011A4  1               @loop:
+0011A4  1  E0 00            cpx #$0 ; any rows down (left)?
+0011A6  1  F0 16            beq @done ; exit loop when x == 0
+0011A8  1                   ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
+0011A8  1  AD F6 08         lda vera_byte_low
+0011AB  1  18               clc
+0011AC  1  69 80            adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
+0011AE  1  8D F6 08         sta vera_byte_low
+0011B1  1  90 08            bcc @decrement  ; no need to change the high byte
+0011B3  1  AD F7 08         lda vera_byte_mid
+0011B6  1  69 00            adc #$0     ; add carry (so +1)
+0011B8  1  8D F7 08         sta vera_byte_mid
+0011BB  1               @decrement: ; next row
+0011BB  1  CA               dex
+0011BC  1  80 E6            bra @loop
+0011BE  1               @done:
+0011BE  1               
+0011BE  1               ; prepare the pointers to the back-end field data, so we know what to display
+0011BE  1  A5 28            lda ZP_PTR_FIELD
+0011C0  1  85 00            sta ZP_PTR_1
+0011C2  1  A5 29            lda ZP_PTR_FIELD+1
+0011C4  1  85 01            sta ZP_PTR_1+1
+0011C6  1               
+0011C6  1               ; start displaying the selected field
+0011C6  1               ; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
+0011C6  1  A2 00            ldx #0 ; row counter
+0011C8  1               @nextrow:
+0011C8  1  A0 00            ldy #0 ; column counter
+0011CA  1                   ; prepare vera pointers for this row
+0011CA  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+0011CD  1  A9 10            lda #$10
+0011CF  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+0011D2  1  AD F7 08         lda vera_byte_mid
+0011D5  1  8D 21 9F         sta VERA_MID
+0011D8  1  AD F6 08         lda vera_byte_low
+0011DB  1  8D 20 9F         sta VERA_LOW
+0011DE  1               
+0011DE  1               @row:
+0011DE  1                   ; sweep the field, row by row, indexed by column y
+0011DE  1  B1 00            lda (ZP_PTR_1),y
+0011E0  1  C9 40            cmp #'@'
+0011E2  1  F0 2A            beq @player
+0011E4  1  C9 2B            cmp #'+'
+0011E6  1  F0 26            beq @player
+0011E8  1  C9 24            cmp #'$'
+0011EA  1  F0 32            beq @crate
+0011EC  1  C9 2E            cmp #'.'
+0011EE  1  F0 4E            beq @goal
+0011F0  1  C9 2A            cmp #'*'
+0011F2  1  F0 3A            beq @crateongoal
+0011F4  1  C9 20            cmp #' '
+0011F6  1  F0 06            beq @ignore
+0011F8  1  C9 00            cmp #0
+0011FA  1  F0 02            beq @ignore
+0011FC  1  80 50            bra @wall
+0011FE  1               @ignore:
+0011FE  1                   ; ignore
+0011FE  1  A9 00            lda #$0 ; black tile
+001200  1  8D 23 9F         sta VERA_DATA0
+001203  1  9C 23 9F         stz VERA_DATA0
+001206  1  C8               iny
+001207  1  CC F4 08         cpy fieldwidth
+00120A  1  D0 D2            bne @row
+00120C  1  80 4E            bra @endline
+00120E  1               @player:
+00120E  1  A9 02            lda #$2
+001210  1  8D 23 9F         sta VERA_DATA0
+001213  1  9C 23 9F         stz VERA_DATA0
+001216  1  C8               iny
+001217  1  CC F4 08         cpy fieldwidth
+00121A  1  D0 C2            bne @row
+00121C  1  80 3E            bra @endline
+00121E  1               @crate:
+00121E  1  A9 03            lda #$3
+001220  1  8D 23 9F         sta VERA_DATA0
+001223  1  9C 23 9F         stz VERA_DATA0
+001226  1  C8               iny
+001227  1  CC F4 08         cpy fieldwidth
+00122A  1  D0 B2            bne @row
+00122C  1  80 2E            bra @endline
+00122E  1               @crateongoal:
+00122E  1  A9 05            lda #$5
+001230  1  8D 23 9F         sta VERA_DATA0
+001233  1  9C 23 9F         stz VERA_DATA0
+001236  1  C8               iny
+001237  1  CC F4 08         cpy fieldwidth
+00123A  1  D0 A2            bne @row
+00123C  1  80 1E            bra @endline
+00123E  1               @goal:
+00123E  1  A9 04            lda #$4
+001240  1  8D 23 9F         sta VERA_DATA0
+001243  1  9C 23 9F         stz VERA_DATA0
+001246  1  C8               iny
+001247  1  CC F4 08         cpy fieldwidth
+00124A  1  D0 92            bne @row
+00124C  1  80 0E            bra @endline
+00124E  1               
+00124E  1               @wall:
+00124E  1  A9 01            lda #$1 ; load tile 1 ; brick
+001250  1  8D 23 9F         sta VERA_DATA0
+001253  1  9C 23 9F         stz VERA_DATA0
+001256  1               
+001256  1  C8               iny
+001257  1  CC F4 08         cpy fieldwidth
+00125A  1  D0 82            bne @row
+00125C  1               @endline:
+00125C  1                   ; advance pointer to next row in the field
+00125C  1  A5 00            lda ZP_PTR_1
+00125E  1  18               clc
+00125F  1  6D F4 08         adc fieldwidth
+001262  1  85 00            sta ZP_PTR_1
+001264  1  90 06            bcc @checklastrow ; no carry, don't increment high byte on pointer
+001266  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+001268  1  69 00            adc #0
+00126A  1  85 01            sta ZP_PTR_1+1
+00126C  1               @checklastrow:
+00126C  1                   ; last row?
+00126C  1                   ; increment vera pointer to next row
+00126C  1  AD F6 08         lda vera_byte_low
+00126F  1  18               clc
+001270  1  69 80            adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
+001272  1  8D F6 08         sta vera_byte_low
+001275  1  90 08            bcc @next3  ; no need to change the high byte
+001277  1  AD F7 08         lda vera_byte_mid
+00127A  1  69 00            adc #$0     ; add carry (so +1)
+00127C  1  8D F7 08         sta vera_byte_mid
+00127F  1               @next3:
+00127F  1  E8               inx
+001280  1  EC F5 08         cpx fieldheight
+001283  1  F0 03            beq @nextsection
+001285  1               
+001285  1  4C C8 11         jmp @nextrow
+001288  1               @nextsection:
+001288  1  60               rts
+001289  1               
+001289  1               printdecimal2:
+001289  1                   ; on entry A = value to print to standard out
+001289  1  DA               phx
+00128A  1  5A               phy
+00128B  1  A2 FF            ldx #$ff
+00128D  1  38               sec
+00128E  1               @prdec100:
+00128E  1  E8               inx
+00128F  1  E9 64            sbc #100
+001291  1  B0 FB            bcs @prdec100
+001293  1  69 64            adc #100
+001295  1  20 A6 12         jsr @prdecdigit
+001298  1  A2 FF            ldx #$ff
+00129A  1  38               sec
+00129B  1               @prdec10:
+00129B  1  E8               inx
+00129C  1  E9 0A            sbc #10
+00129E  1  B0 FB            bcs @prdec10
+0012A0  1  69 0A            adc #10
+0012A2  1  20 A6 12         jsr @prdecdigit
+0012A5  1  AA               tax
+0012A6  1               @prdecdigit:
+0012A6  1               ;    pha
+0012A6  1  8A               txa
+0012A7  1  09 30            ora #'0'
+0012A9  1               ;    jsr CHROUT
+0012A9  1               ;    pla
+0012A9  1  7A               ply
+0012AA  1  FA               plx
+0012AB  1  8D 23 9F         sta VERA_DATA0
+0012AE  1  8E 23 9F         stx VERA_DATA0
+0012B1  1  60               rts
+0012B2  1               
+0012B2  1               titlescreen:
+0012B2  1  00 00 01 00  .incbin "tiles/titlescreen.bin"
+0012B6  1  01 00 01 00  
+0012BA  1  00 00 00 00  
+0022B2  1               messagescreen:
+0022B2  1  00 00 00 00  .incbin "tiles/messagescreen.bin"
+0022B6  1  00 00 00 00  
+0022BA  1  00 00 00 00  
+0032B2  1               tiledata:
+0032B2  1               black:
+0032B2  1  00 00 00 00  .incbin "tiles/black.bin"
+0032B6  1  00 00 00 00  
+0032BA  1  00 00 00 00  
+0033B2  1               Brick:
+0033B2  1  08 08 08 08  .incbin "tiles/brick.bin"
+0033B6  1  08 08 08 E5  
+0033BA  1  08 08 08 08  
+0034B2  1               player:
+0034B2  1  00 00 00 00  .incbin "tiles/player.bin"
+0034B6  1  00 10 10 10  
+0034BA  1  10 0B 00 00  
+0035B2  1               crate:
+0035B2  1  57 57 57 57  .incbin "tiles/crate.bin"
+0035B6  1  57 57 57 57  
+0035BA  1  57 57 57 57  
+0036B2  1               goal:
+0036B2  1  00 00 00 00  .incbin "tiles/goal.bin"
+0036B6  1  00 00 00 00  
+0036BA  1  00 00 00 00  
+0037B2  1               crateongoal:
+0037B2  1  57 57 57 57  .incbin "tiles/crateongoal.bin"
+0037B6  1  57 57 57 57  
+0037BA  1  57 57 57 57  
+0038B2  1               LOADSTART:
+0038B2  1  32 00 F6 01  .incbin "levels.bin"
+0038B6  1  0B 00 0B 00  
+0038BA  1  03 00 30 00  
+0038B2  1               

@@ -29,13 +29,15 @@ VERA_CTRL           = $9F25
 quitaskmessage:      .byte "really quit? y/n",0
 selectmessage:    .byte "select a level (1-",0
 selectendmessage: .byte "): ",0
+resetmessage:     .byte "really reset level? y/n",0
 quitmessage:      .byte "press q to quit",0
 winstatement:     .byte "level complete! new level? y/n",0
 help0:            .byte "(c)2021 venom",0
 help1:            .byte "keyboard shortcuts:",0
 help2:            .byte "cursor - moves player",0
 help3:            .byte "     q - quit",0
-help4:            .byte "     u - undo",0
+help4:            .byte "     u - undo move(s)",0
+help5:            .byte "     r - reset level",0
 
 ; variables that the program uses during execution
 currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
@@ -63,9 +65,10 @@ start:
     lda #UPPERCASE
     jsr CHROUT
 
-    jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
+
+    jsr resetvars
     jsr cleartiles
 
     jsr displaytitlescreen
@@ -99,9 +102,25 @@ keyloop:
     bra @done
 @checkundo:
     cmp #$55 ; 'u'
-    bne @checkquit
+    bne @checkreset
     jsr handle_undocommand
     bra @done
+@checkreset:
+    cmp #$52 ; 'r'
+    bne @checkquit
+    jsr askreset
+    bcs @resetgame
+    jsr cls
+    jsr cleartiles
+    jsr printfield2
+    bra @done
+@resetgame:
+    jsr cls
+    jsr cleartiles
+    jsr resetvars
+    jsr initfield
+    jsr printfield2
+    bra keyloop
 @checkquit:
     cmp #$51 ; 'q'
     bne @done
@@ -184,6 +203,27 @@ askquit:
     lda #<quitaskmessage
     sta ZP_PTR_1
     lda #>quitaskmessage
+    sta ZP_PTR_1+1
+    jsr displaymessagescreen
+
+@keyloop:
+    jsr GETIN
+@checkyes:
+    cmp #$59 ; Y
+    bne @checkno
+    sec
+    rts
+@checkno:
+    cmp #$4e ; N
+    bne @keyloop
+    clc
+    rts
+
+askreset:
+    ; ask if the user would like to reset, and return carry on 'y'
+    lda #<resetmessage
+    sta ZP_PTR_1
+    lda #>resetmessage
     sta ZP_PTR_1+1
     jsr displaymessagescreen
 
@@ -1437,6 +1477,15 @@ displayhelp:
     sta VERA_LOW
     jsr printverastring
 
+    lda #<help5
+    sta ZP_PTR_1
+    lda #>help5
+    sta ZP_PTR_1+1
+    lda #35
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
     rts
 
 cleartiles:
