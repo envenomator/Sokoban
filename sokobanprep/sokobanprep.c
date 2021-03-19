@@ -5,7 +5,7 @@
 #include <math.h>
 
 #define LOADADDRESSIZE 2
-#define HEADERSIZE 10
+#define HEADERSIZE 12
 #define BUFFERSIZE 128
 #define MAXWIDTH 40
 #define MAXHEIGHT 30
@@ -14,6 +14,7 @@ char linebuffer[BUFFERSIZE];
 
 int getplayerpos(char *string);
 int get_goalsfromline(char *string);
+int get_takengoalsfromline(char *string);
 int get_cratesfromline(char *string);
 bool isdataline(char *string);
 
@@ -27,6 +28,8 @@ int main(int argc, char *argv[])
     unsigned int * levelheight;
     unsigned int * levelwidth;
     unsigned int * levelgoals;
+    unsigned int * levelgoalstaken; // the number of crates on goals in each level
+    unsigned int * levelgoalsopen;  // the number of still to be completed goals in each level
     unsigned int * leveloffset;
     unsigned int * levelcrates;
     bool * validlevel;          // record if each level is valid or not
@@ -66,6 +69,8 @@ int main(int argc, char *argv[])
     levelheight = malloc(numlevels * sizeof(unsigned int));
     levelwidth = malloc(numlevels * sizeof(unsigned int));
     levelgoals = malloc(numlevels * sizeof(unsigned int));
+    levelgoalstaken = malloc(numlevels * sizeof(unsigned int));
+    levelgoalsopen = malloc(numlevels * sizeof(unsigned int));
     levelcrates = malloc(numlevels * sizeof(unsigned int));
     leveloffset = malloc(numlevels * sizeof(unsigned int));
     validlevel = malloc(numlevels * sizeof(bool));
@@ -78,6 +83,8 @@ int main(int argc, char *argv[])
             levelheight[level-1] = 0;
             levelwidth[level-1] = 0;
             levelgoals[level-1] = 0;
+            levelgoalstaken[level-1] = 0;
+            levelgoalsopen[level -1] = 0;
             leveloffset[level-1] = 0;
             levelcrates[level-1] = 0;
         }
@@ -93,6 +100,7 @@ int main(int argc, char *argv[])
 
                     levelheight[level-1]++; // add another line to this level
                     levelgoals[level-1] += get_goalsfromline(linebuffer);
+                    levelgoalstaken[level-1] += get_takengoalsfromline(linebuffer);
                     levelcrates[level-1] += get_cratesfromline(linebuffer);
 
                 }
@@ -206,10 +214,12 @@ int main(int argc, char *argv[])
 
 //                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
                 leveloffset[n] = leveloffset[n] -1; // convert to zero-based offset from start of each level
+                levelgoalstaken[n] = levelgoals[n] - levelgoalstaken[n];
                 fprintf(outptr,"%c%c",(char)fieldptr,(char)(fieldptr>>8));
                 fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
                 fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));
                 fprintf(outptr,"%c%c",(char)levelgoals[n],(char)(levelgoals[n]>>8));
+                fprintf(outptr,"%c%c",(char)levelgoalstaken[n],(char)(levelgoalstaken[n]>>8));
                 fprintf(outptr,"%c%c",(char)leveloffset[n],(char)(leveloffset[n]>>8));
 
                 previouspayloadsize = levelwidth[n] * levelheight[n];
@@ -252,6 +262,8 @@ int main(int argc, char *argv[])
     free(levelheight);
     free(levelwidth);
     free(levelgoals);
+    free(levelgoalstaken);
+    free(levelgoalsopen);
     free(leveloffset);
     free(validlevel);
     free(levelcrates);
@@ -285,6 +297,18 @@ int get_goalsfromline(char *string)
         string++;
     }
     return goalnum;
+}
+
+int get_takengoalsfromline(char *string)
+{
+    unsigned int takengoals = 0;
+    while(*string)
+    {
+        if(*string == '*') takengoals++;
+        string++;
+    }
+    return takengoals;
+    
 }
 
 int get_cratesfromline(char *string)

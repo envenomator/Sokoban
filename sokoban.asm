@@ -4,11 +4,11 @@
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
-LEVELHEADER = 10
+LEVELHEADER = 12
 MAXUNDO = 10
 SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
 SCREENHEIGHT = 30
-RAMBANK = $a000         ; Ram Bank 0
+RAMBANK = $3000         ; Ram Bank 0
 
 .org $080D
 .segment "STARTUP"
@@ -997,7 +997,7 @@ level_to_rambank:
     ; next header
     clc
     lda ZP_PTR_1
-    adc #10
+    adc #LEVELHEADER
     sta ZP_PTR_1
     lda ZP_PTR_1+1
     adc #0
@@ -1101,7 +1101,10 @@ initfield:
     ldy #6  ; index from payload pointer to goals in this level (low byte)
     lda (ZP_PTR_1),y
     sta no_goals
-    ldy #8  ; index from payload pointer to player offset in this level
+    ldy #8  ; index from payload pointer to goals taken in this level (low byte)
+    lda (ZP_PTR_1),y
+    sta no_goalsreached
+    ldy #10  ; index from payload pointer to player offset in this level
 
     lda (ZP_PTR_1),y
     clc
