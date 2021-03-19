@@ -38,6 +38,9 @@ help2:            .byte "cursor - moves player",0
 help3:            .byte "     q - quit",0
 help4:            .byte "     u - undo move(s)",0
 help5:            .byte "     r - reset level",0
+done0:            .byte "m(enu)",0
+done1:            .byte "n(ext)",0
+done2:            .byte "q(uit)",0
 
 ; variables that the program uses during execution
 currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
@@ -71,12 +74,6 @@ start:
     jsr resetvars
     jsr cleartiles
 
-    lda #<completescreen
-    sta ZP_PTR_1
-    lda #>completescreen
-    sta ZP_PTR_1+1
-    jsr displaytileset
-    rts
     jsr displaytitlescreen
     jsr selectlevel
     jsr cleartiles      ; cls tiles
@@ -145,8 +142,27 @@ keyloop:
     cmp no_goalsreached
     bne @donenextkey
     jsr asknewlevel
-    bcs @exit
-    jmp start   ; reset game / let user decide on new level
+    cmp #$4d ; Menu
+    beq @gotomenu   ; reset game / let user decide on new level
+    cmp #$51 ; Quit
+    bne @nextgame
+    jsr resetlayerconfig
+    rts
+@gotomenu:
+    jmp start
+@nextgame:
+    ; check if this was the last level
+    lda no_levels
+    cmp currentlevel
+    beq @gotomenu   ; select another game
+    inc currentlevel ; next level
+    jsr cls
+    jsr resetvars
+    jsr cleartiles
+
+    jsr initfield       ; load correct startup values for selected field
+    jsr printfield2
+
 @donenextkey:
     jmp keyloop
 
@@ -184,24 +200,62 @@ handle_undocommand:
     rts
 
 asknewlevel:
-    ; ask if the user would like to play a new level, and return clear carry on 'y'
-    lda #<winstatement
+    ; display level complete tilesetj
+    jsr cls
+    lda #<completescreen
     sta ZP_PTR_1
-    lda #>winstatement
+    lda #>completescreen
     sta ZP_PTR_1+1
-    jsr displaymessagescreen
+    jsr displaytileset
+
+    stz VERA_CTRL
+    ldx #$9 ; color brown
+    lda #$10
+    sta VERA_HIGH
+
+    lda #<done0
+    sta ZP_PTR_1
+    lda #>done0
+    sta ZP_PTR_1+1
+    lda #37
+    sta VERA_MID
+    lda #38*2
+    sta VERA_LOW
+    jsr printverastring
+
+    lda #<done1
+    sta ZP_PTR_1
+    lda #>done1
+    sta ZP_PTR_1+1
+    lda #41
+    sta VERA_MID
+    lda #38*2
+    sta VERA_LOW
+    jsr printverastring
+
+    lda #<done2
+    sta ZP_PTR_1
+    lda #>done2
+    sta ZP_PTR_1+1
+    lda #45
+    sta VERA_MID
+    lda #38*2
+    sta VERA_LOW
+    jsr printverastring
 
 @keyloop:
     jsr GETIN
-@checkyes:
-    cmp #$59 ; Y
-    bne @checkno
-    clc
+@checkmenu:
+    cmp #$4D ; M (enu)
+    bne @checknext
     rts
-@checkno:
-    cmp #$4e ; N
+@checknext:
+    cmp #$4E ; N (ext)
+    bne @checkquit
+    rts
+@checkquit:
+    cmp #$51 ; Q (uit)
     bne @keyloop
-    sec
     rts
 
 askquit:
