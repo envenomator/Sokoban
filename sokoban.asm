@@ -71,6 +71,12 @@ start:
     jsr resetvars
     jsr cleartiles
 
+    lda #<completescreen
+    sta ZP_PTR_1
+    lda #>completescreen
+    sta ZP_PTR_1+1
+    jsr displaytileset
+    rts
     jsr displaytitlescreen
     jsr selectlevel
     jsr cleartiles      ; cls tiles
@@ -1592,6 +1598,8 @@ titlescreen:
 .incbin "tiles/titlescreen.bin"
 messagescreen:
 .incbin "tiles/messagescreen.bin"
+completescreen:
+.incbin "tiles/complete.bin"
 tiledata:
 black:
 .incbin "tiles/black.bin"
