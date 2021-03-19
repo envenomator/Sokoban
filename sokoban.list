@@ -251,10 +251,10 @@ Current file: sokoban.asm
 000000r 1               CLEARSCREEN = 147
 000000r 1               LEVELHEADER = 10
 000000r 1               MAXUNDO = 10
-000000r 1               
-000000r 1               ; screen 16x16bit tile width/height
-000000r 1               SCREENWIDTH = 40
+000000r 1               SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
 000000r 1               SCREENHEIGHT = 30
+000000r 1               RAMBANK = $3000         ; Ram Bank 0
+000000r 1               
 000000r 1               .org $080D
 00080D  1               .segment "STARTUP"
 00080D  1               .segment "INIT"
@@ -328,18 +328,19 @@ Current file: sokoban.asm
 0008B9  1  A9 8E            lda #UPPERCASE
 0008BB  1  20 D2 FF         jsr CHROUT
 0008BE  1               
+0008BE  1               ;    jsr levels_to_rambank   ; copy level data to the ram bank first
 0008BE  1  20 E6 0C         jsr resetvars
-0008C1  1  20 D1 0D         jsr loadtiles       ; load tiles from normal memory to VRAM
-0008C4  1  20 EB 0E         jsr layerconfig     ; configure layer 0/1 on screen
-0008C7  1  20 BE 0E         jsr cleartiles
+0008C1  1  20 E3 0E         jsr loadtiles       ; load tiles from normal memory to VRAM
+0008C4  1  20 FD 0F         jsr layerconfig     ; configure layer 0/1 on screen
+0008C7  1  20 D0 0F         jsr cleartiles
 0008CA  1               
-0008CA  1  20 24 0E         jsr displaytitlescreen
+0008CA  1  20 36 0F         jsr displaytitlescreen
 0008CD  1               
 0008CD  1  20 6C 0C         jsr selectlevel
-0008D0  1  20 BE 0E         jsr cleartiles      ; cls tiles
+0008D0  1  20 D0 0F         jsr cleartiles      ; cls tiles
 0008D3  1               
-0008D3  1  20 09 0D         jsr initfield       ; load correct startup values for selected field
-0008D6  1  20 5C 0F         jsr printfield2
+0008D3  1  20 AE 0D         jsr initfield       ; load correct startup values for selected field
+0008D6  1  20 6E 10         jsr printfield2
 0008D9  1               ;    jsr printfield
 0008D9  1               
 0008D9  1               keyloop:
@@ -486,8 +487,8 @@ Current file: sokoban.asm
 000994  1               
 000994  1  20 A3 0B         jsr movecrateonfield
 000997  1               @done:
-000997  1  20 CB 0D         jsr cls
-00099A  1  20 5C 0F         jsr printfield2
+000997  1  20 DD 0E         jsr cls
+00099A  1  20 6E 10         jsr printfield2
 00099D  1  60               rts
 00099E  1               
 00099E  1               handleleft:
@@ -561,8 +562,8 @@ Current file: sokoban.asm
 0009ED  1               
 0009ED  1  20 A3 0B         jsr movecrateonfield
 0009F0  1               @done:
-0009F0  1  20 CB 0D         jsr cls
-0009F3  1  20 5C 0F         jsr printfield2
+0009F0  1  20 DD 0E         jsr cls
+0009F3  1  20 6E 10         jsr printfield2
 0009F6  1  60               rts
 0009F7  1               
 0009F7  1               handleup:
@@ -640,8 +641,8 @@ Current file: sokoban.asm
 000A53  1               
 000A53  1  20 A3 0B         jsr movecrateonfield
 000A56  1               @done:
-000A56  1  20 CB 0D         jsr cls
-000A59  1  20 5C 0F         jsr printfield2
+000A56  1  20 DD 0E         jsr cls
+000A59  1  20 6E 10         jsr printfield2
 000A5C  1  60               rts
 000A5D  1               
 000A5D  1               handledown:
@@ -719,8 +720,8 @@ Current file: sokoban.asm
 000AB9  1               
 000AB9  1  20 A3 0B         jsr movecrateonfield
 000ABC  1               @done:
-000ABC  1  20 CB 0D         jsr cls
-000ABF  1  20 5C 0F         jsr printfield2
+000ABC  1  20 DD 0E         jsr cls
+000ABF  1  20 6E 10         jsr printfield2
 000AC2  1  60               rts
 000AC3  1               
 000AC3  1               
@@ -734,8 +735,8 @@ Current file: sokoban.asm
 000AC3  1                   ; dummy undo up only
 000AC3  1  20 E4 0B         jsr moveplayeronfield
 000AC6  1  20 9A 0B         jsr moveplayerposition
-000AC9  1  20 CB 0D         jsr cls
-000ACC  1  20 5C 0F         jsr printfield2
+000AC9  1  20 DD 0E         jsr cls
+000ACC  1  20 6E 10         jsr printfield2
 000ACF  1  60               rts
 000AD0  1               
 000AD0  1                   ; move the player 'back' first. Might return to a goal
@@ -786,8 +787,8 @@ Current file: sokoban.asm
 000B08  1  85 01            sta ZP_PTR_1+1
 000B0A  1               
 000B0A  1                   ; output the playing field
-000B0A  1  20 5C 0F         jsr printfield2
-000B0D  1  20 CB 0D         jsr cls
+000B0A  1  20 6E 10         jsr printfield2
+000B0D  1  20 DD 0E         jsr cls
 000B10  1               
 000B10  1  60               rts
 000B11  1               
@@ -841,8 +842,8 @@ Current file: sokoban.asm
 000B53  1  20 5F 0B         jsr push_undostack
 000B56  1               
 000B56  1               @movecomplete:
-000B56  1  20 5C 0F         jsr printfield2
-000B59  1  20 CB 0D         jsr cls
+000B56  1  20 6E 10         jsr printfield2
+000B59  1  20 DD 0E         jsr cls
 000B5C  1  60               rts
 000B5D  1               
 000B5D  1               @ignore: ; nothing to move
@@ -1065,8 +1066,8 @@ Current file: sokoban.asm
 000C6E  1  8D A5 08         sta currentlevel
 000C71  1               
 000C71  1               @mainloop:
-000C71  1  20 CB 0D         jsr cls
-000C74  1  20 6A 0E         jsr displayhelp
+000C71  1  20 DD 0E         jsr cls
+000C74  1  20 7C 0F         jsr displayhelp
 000C77  1               
 000C77  1  18               clc         ; PLOT to x,y
 000C78  1  A0 00            ldy #0      ; column
@@ -1128,7 +1129,7 @@ Current file: sokoban.asm
 000CDE  1  C9 0D            cmp #$0d
 000CE0  1  D0 CC            bne @charloop
 000CE2  1                   ; return key pressed - select this level
-000CE2  1  20 CB 0D         jsr cls
+000CE2  1  20 DD 0E         jsr cls
 000CE5  1  60               rts
 000CE6  1               
 000CE6  1               resetvars:
@@ -1138,9 +1139,9 @@ Current file: sokoban.asm
 000CEB  1               
 000CEB  1                   ; load field pointer to first address at LOADSTART
 000CEB  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000CEB  1  A9 80            lda #<LOADSTART
+000CEB  1  A9 92            lda #<LOADSTART
 000CED  1  85 00            sta ZP_PTR_1
-000CEF  1  A9 26            lda #>LOADSTART
+000CEF  1  A9 27            lda #>LOADSTART
 000CF1  1  85 01            sta ZP_PTR_1+1
 000CF3  1               
 000CF3  1                   ; load number of levels, pointed to by ZP_PTR_1,0
@@ -1158,608 +1159,818 @@ Current file: sokoban.asm
 000D05  1  9C B8 08         stz undocounter
 000D08  1  60               rts
 000D09  1               
-000D09  1               initfield:
-000D09  1                   ; load field pointer to first address at LOADSTART
-000D09  1                   ; load 1st pointer to temp pointer ZP_PTR_1
-000D09  1  A9 80            lda #<LOADSTART
-000D0B  1  85 00            sta ZP_PTR_1
-000D0D  1  A9 26            lda #>LOADSTART
-000D0F  1  85 01            sta ZP_PTR_1+1
-000D11  1               
-000D11  1                   ; skip to the first header, two bytes next
-000D11  1  18               clc
-000D12  1  A5 00            lda ZP_PTR_1
-000D14  1  69 02            adc #2
-000D16  1  85 00            sta ZP_PTR_1
-000D18  1               
-000D18  1                   ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
-000D18  1  AD A5 08         lda currentlevel
-000D1B  1  AA               tax ; x contains the currentlevel now and will act as a counter
-000D1C  1               @loop:
-000D1C  1  CA               dex
-000D1D  1  F0 11            beq @fieldptrdone
-000D1F  1                   ; advance the field payload pointer
-000D1F  1  A5 00            lda ZP_PTR_1
-000D21  1  18               clc
-000D22  1  69 0A            adc #LEVELHEADER
-000D24  1  85 00            sta ZP_PTR_1
-000D26  1  90 F4            bcc @loop   ; nothing to do for the high byte
-000D28  1  A5 01            lda ZP_PTR_1+1
-000D2A  1  69 00            adc #$0     ; increase the high byte
-000D2C  1  85 01            sta ZP_PTR_1+1
-000D2E  1  80 EC            bra @loop
-000D30  1               @fieldptrdone:
-000D30  1  A0 00            ldy #0  ; index to the offset from LOADSTART
-000D32  1                   ; add LOADSTART address to the offset in this field
-000D32  1  18               clc
-000D33  1  B1 00            lda (ZP_PTR_1),y
-000D35  1  69 80            adc #<LOADSTART
-000D37  1  85 28            sta ZP_PTR_FIELD
-000D39  1  C8               iny
-000D3A  1  B1 00            lda (ZP_PTR_1),y
-000D3C  1  69 26            adc #>LOADSTART
-000D3E  1  85 29            sta ZP_PTR_FIELD+1
-000D40  1                   ; ZP_PTR_FIELD now contains the actual address in memory, not only the offset from the data
-000D40  1               
-000D40  1  A0 02            ldy #2  ; index from payload pointer to width variable (low byte)
-000D42  1  B1 00            lda (ZP_PTR_1),y
-000D44  1  8D A9 08         sta fieldwidth
-000D47  1  A0 04            ldy #4  ; index from payload pointer to height variable (low byte)
-000D49  1  B1 00            lda (ZP_PTR_1),y
-000D4B  1  8D AA 08         sta fieldheight
-000D4E  1  A0 06            ldy #6  ; index from payload pointer to goals in this level (low byte)
-000D50  1  B1 00            lda (ZP_PTR_1),y
-000D52  1  8D A7 08         sta no_goals
-000D55  1  A0 08            ldy #8  ; index from payload pointer to player ptr in this level
-000D57  1               
-000D57  1  18               clc
-000D58  1  B1 00            lda (ZP_PTR_1),y
-000D5A  1  69 80            adc #<LOADSTART
-000D5C  1  85 24            sta ZP_PTR_3
-000D5E  1  C8               iny
-000D5F  1  B1 00            lda (ZP_PTR_1),y
-000D61  1  69 26            adc #>LOADSTART
-000D63  1  85 25            sta ZP_PTR_3+1
-000D65  1                   ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
-000D65  1  60               rts
-000D66  1               
-000D66  1               printfield:
-000D66  1                   ; no clearscreen, just print the field to screen on current position
-000D66  1                   ; depends only on
-000D66  1                   ; - field label for start of field
-000D66  1               
-000D66  1  A5 28            lda ZP_PTR_FIELD
-000D68  1  85 00            sta ZP_PTR_1
-000D6A  1  A5 29            lda ZP_PTR_FIELD+1
-000D6C  1  85 01            sta ZP_PTR_1+1
-000D6E  1  A2 00            ldx #0 ; row counter
-000D70  1               @nextrow:
-000D70  1  A0 00            ldy #0 ; column counter
-000D72  1               @row:
-000D72  1  B1 00            lda (ZP_PTR_1),y
-000D74  1  C9 40            cmp #'@'
-000D76  1  F0 06            beq @character
-000D78  1  C9 2B            cmp #'+'
-000D7A  1  F0 02            beq @character
-000D7C  1  80 17            bra @normalcolor
-000D7E  1               @character:
-000D7E  1  48               pha
-000D7F  1  A9 9E            lda #$9e ; YELLOW
-000D81  1  20 D2 FF         jsr CHROUT
-000D84  1  68               pla
-000D85  1  20 D2 FF         jsr CHROUT
-000D88  1  A9 05            lda #$05 ; WHITE
-000D8A  1  20 D2 FF         jsr CHROUT
-000D8D  1  C8               iny
-000D8E  1  CC A9 08         cpy fieldwidth
-000D91  1  D0 DF            bne @row
-000D93  1  80 09            bra @endline
-000D95  1               @normalcolor:
-000D95  1  20 D2 FF         jsr CHROUT
-000D98  1  C8               iny
-000D99  1  CC A9 08         cpy fieldwidth
-000D9C  1  D0 D4            bne @row
-000D9E  1               @endline:
-000D9E  1  A9 0D            lda #NEWLINE
-000DA0  1  20 D2 FF         jsr CHROUT
-000DA3  1               
-000DA3  1                   ; advance pointer to next row
-000DA3  1  A5 00            lda ZP_PTR_1
-000DA5  1  18               clc
-000DA6  1  6D A9 08         adc fieldwidth
-000DA9  1  85 00            sta ZP_PTR_1
-000DAB  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
-000DAD  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-000DAF  1  18               clc
-000DB0  1  69 01            adc #1
-000DB2  1  85 01            sta ZP_PTR_1+1
-000DB4  1               @checklastrow:
-000DB4  1                   ; last row?
-000DB4  1  E8               inx
-000DB5  1  EC AA 08         cpx fieldheight
-000DB8  1  D0 B6            bne @nextrow
-000DBA  1               
-000DBA  1                   ; print quit message at the end of the field
-000DBA  1  A9 0D            lda #NEWLINE
-000DBC  1  20 D2 FF         jsr CHROUT
-000DBF  1  A9 31            lda #<quitmessage
-000DC1  1  85 00            sta ZP_PTR_1
-000DC3  1  A9 08            lda #>quitmessage
-000DC5  1  85 01            sta ZP_PTR_1+1
-000DC7  1  20 2E 0C         jsr printline
-000DCA  1               
-000DCA  1  60               rts
-000DCB  1               
-000DCB  1               cls:
-000DCB  1  A9 93            lda #CLEARSCREEN
-000DCD  1  20 D2 FF         jsr CHROUT
-000DD0  1  60               rts
-000DD1  1               
-000DD1  1               loadtiles:
-000DD1  1               ; Build  16x16 256 color tiles in VRAM location $12000
-000DD1  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000DD4  1  A9 11            lda #$11
-000DD6  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
-000DD9  1  A9 20            lda #$20
-000DDB  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $20
-000DDE  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
-000DE1  1               
-000DE1  1  A2 00            ldx #0
-000DE3  1  BD 80 20     :   lda tiledata,x                      ; index 0 / black tile
-000DE6  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000DE9  1  E8               inx
-000DEA  1  D0 F7            bne :-
-000DEC  1                   ; load Brick data
-000DEC  1  A2 00            ldx #0
-000DEE  1  BD 80 21     :   lda Brick,x                         ; index 1 / brick
-000DF1  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000DF4  1  E8               inx
-000DF5  1  D0 F7            bne :-
-000DF7  1                   ; load player data
-000DF7  1  A2 00            ldx #0
-000DF9  1  BD 80 22     :   lda player,x                        ; index 2 / player
-000DFC  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000DFF  1  E8               inx
-000E00  1  D0 F7            bne :-
-000E02  1                   ; load crate data
-000E02  1  A2 00            ldx #0
-000E04  1  BD 80 23     :   lda crate,x                         ; index 3 / crate (normal)
-000E07  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000E0A  1  E8               inx
-000E0B  1  D0 F7            bne :-
-000E0D  1                   ; load goal data
-000E0D  1  A2 00            ldx #0
-000E0F  1  BD 80 24     :   lda goal,x                         ; index 4 / goal (normal)
-000E12  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000E15  1  E8               inx
-000E16  1  D0 F7            bne :-
-000E18  1                   ; load crateongoal data
-000E18  1  A2 00            ldx #0
-000E1A  1  BD 80 25     :   lda crateongoal,x                   ; index 5 / crate on goal
-000E1D  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000E20  1  E8               inx
-000E21  1  D0 F7            bne :-
-000E23  1               
-000E23  1  60               rts
-000E24  1               
-000E24  1               displaytitlescreen:
-000E24  1               
-000E24  1               ; Fill the Layer 0 with the titlescreen tileset
-000E24  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000E27  1  A9 10            lda #$10
-000E29  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000E2C  1  A9 40            lda #$40
-000E2E  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-000E31  1  A9 00            lda #$0
-000E33  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+000D09  1               level_to_rambank:
+000D09  1                   ; copy selected level data to Ram bank 0
+000D09  1                   ; uses ZP_PTR_1 & ZP_PTR_2, temp for storing amount of bytes to copy
+000D09  1               
+000D09  1                   ; start at 2 bytes, the size of the word storing the number of levels
+000D09  1  A9 02            lda #02
+000D0B  1  85 30            sta temp
+000D0D  1  64 31            stz temp+1
+000D0F  1               
+000D0F  1                   ; ZP_PTR_1 will point to the source data
+000D0F  1  A9 92            lda #<LOADSTART
+000D11  1  85 00            sta ZP_PTR_1
+000D13  1  A9 27            lda #>LOADSTART
+000D15  1  85 01            sta ZP_PTR_1+1
+000D17  1               
+000D17  1                   ; load number of levels, pointed to by ZP_PTR_1,0
+000D17  1  A0 00            ldy #0
+000D19  1  B1 00            lda (ZP_PTR_1),y
+000D1B  1  8D A6 08         sta no_levels
+000D1E  1               
+000D1E  1                   ; start at first level HEADER
+000D1E  1  A9 94            lda #<LOADSTART+2
+000D20  1  85 00            sta ZP_PTR_1
+000D22  1  A9 27            lda #>LOADSTART
+000D24  1  85 01            sta ZP_PTR_1+1
+000D26  1               
+000D26  1               ; iterate through each header and add the level's size to the temp variable
+000D26  1               @nextlevel:
+000D26  1                   ; go to width variable
+000D26  1  A0 02            ldy #2
+000D28  1                   ; store width variable to fieldwidth - this is a 8-bit variable, so no high byte needed
+000D28  1  B1 00            lda (ZP_PTR_1),y
+000D2A  1  8D A9 08         sta fieldwidth
+000D2D  1                   ; go to height variable
+000D2D  1  C8               iny
+000D2E  1  C8               iny
+000D2F  1  B1 00            lda (ZP_PTR_1),y
+000D31  1  AA               tax ; loop counter
+000D32  1               
+000D32  1               @multiply:
+000D32  1                   ; add fieldwidth variable to temp at each interation - temp = temp + (width * height)
+000D32  1  A5 30            lda temp
+000D34  1  18               clc
+000D35  1  6D A9 08         adc fieldwidth
+000D38  1  85 30            sta temp
+000D3A  1  A5 31            lda temp+1 ; don't forget the high byte
+000D3C  1  69 00            adc #0
+000D3E  1  85 31            sta temp+1
+000D40  1  CA               dex
+000D41  1  D0 EF            bne @multiply
+000D43  1               
+000D43  1                   ; add HEADER size for this level to temp
+000D43  1  A5 30            lda temp
+000D45  1  18               clc
+000D46  1  69 0A            adc #LEVELHEADER
+000D48  1  85 30            sta temp
+000D4A  1  A5 31            lda temp+1
+000D4C  1  69 00            adc #0
+000D4E  1  85 31            sta temp+1
+000D50  1               
+000D50  1                   ; next level?
+000D50  1  CE A6 08         dec no_levels
+000D53  1  F0 0F            beq @copydata
+000D55  1               
+000D55  1                   ; next header
+000D55  1  18               clc
+000D56  1  A5 00            lda ZP_PTR_1
+000D58  1  69 0A            adc #10
+000D5A  1  85 00            sta ZP_PTR_1
+000D5C  1  A5 01            lda ZP_PTR_1+1
+000D5E  1  69 00            adc #0
+000D60  1  85 01            sta ZP_PTR_1+1
+000D62  1               
+000D62  1  80 C2            bra @nextlevel
+000D64  1               @copydata:
+000D64  1                   ; copy (temp) amount of bytes from LOADSTART to Ram bank 0
+000D64  1               
+000D64  1                   ; set up source pointer
+000D64  1  A9 92            lda #<LOADSTART
+000D66  1  85 00            sta ZP_PTR_1
+000D68  1  A9 27            lda #>LOADSTART
+000D6A  1  85 01            sta ZP_PTR_1+1
+000D6C  1               
+000D6C  1                   ; set up destination pointer
+000D6C  1  A9 00            lda #<RAMBANK
+000D6E  1  85 22            sta ZP_PTR_2
+000D70  1  A9 30            lda #>RAMBANK
+000D72  1  85 23            sta ZP_PTR_2+1
+000D74  1               
+000D74  1  A0 00            ldy #0
+000D76  1               @copybyte:
+000D76  1                   ; copy one byte of data
+000D76  1  B1 00            lda (ZP_PTR_1),y
+000D78  1  91 22            sta (ZP_PTR_2),y
+000D7A  1               
+000D7A  1                   ; temp = temp -1
+000D7A  1  A5 30            lda temp
+000D7C  1  38               sec
+000D7D  1  E9 01            sbc #1
+000D7F  1  85 30            sta temp
+000D81  1  A5 31            lda temp+1
+000D83  1  E9 00            sbc #0
+000D85  1  85 31            sta temp+1
+000D87  1               
+000D87  1                   ; if temp==0 done
+000D87  1  A5 31            lda temp+1
+000D89  1  D0 06            bne @copynextbyte
+000D8B  1  A5 30            lda temp
+000D8D  1  D0 02            bne @copynextbyte
+000D8F  1  80 1C            bra @done
+000D91  1               @copynextbyte:
+000D91  1  A5 00            lda ZP_PTR_1
+000D93  1  18               clc
+000D94  1  69 01            adc #1
+000D96  1  85 00            sta ZP_PTR_1
+000D98  1  A5 01            lda ZP_PTR_1+1
+000D9A  1  69 00            adc #0
+000D9C  1  85 01            sta ZP_PTR_1+1
+000D9E  1  A5 22            lda ZP_PTR_2
+000DA0  1  18               clc
+000DA1  1  69 01            adc #1
+000DA3  1  85 22            sta ZP_PTR_2
+000DA5  1  A5 23            lda ZP_PTR_2+1
+000DA7  1  69 00            adc #0
+000DA9  1  85 23            sta ZP_PTR_2+1
+000DAB  1  80 C9            bra @copybyte
+000DAD  1               @done:
+000DAD  1  60               rts
+000DAE  1               
+000DAE  1               
+000DAE  1               initfield:
+000DAE  1                   ; load field pointer to first address at LOADSTART
+000DAE  1                   ; load 1st pointer to temp pointer ZP_PTR_1
+000DAE  1  A9 92            lda #<LOADSTART
+000DB0  1  85 00            sta ZP_PTR_1
+000DB2  1  A9 27            lda #>LOADSTART
+000DB4  1  85 01            sta ZP_PTR_1+1
+000DB6  1               
+000DB6  1                   ; skip to the first header, two bytes next
+000DB6  1  18               clc
+000DB7  1  A5 00            lda ZP_PTR_1
+000DB9  1  69 02            adc #2
+000DBB  1  85 00            sta ZP_PTR_1
+000DBD  1               
+000DBD  1                   ; now advance pointer (currentlevel - 1) * HEADERSIZE to advance to the correct payload pointer to that level
+000DBD  1  AD A5 08         lda currentlevel
+000DC0  1  AA               tax ; x contains the currentlevel now and will act as a counter
+000DC1  1               @loop:
+000DC1  1  CA               dex
+000DC2  1  F0 11            beq @fieldptrdone
+000DC4  1                   ; advance the field payload pointer
+000DC4  1  A5 00            lda ZP_PTR_1
+000DC6  1  18               clc
+000DC7  1  69 0A            adc #LEVELHEADER
+000DC9  1  85 00            sta ZP_PTR_1
+000DCB  1  90 F4            bcc @loop   ; nothing to do for the high byte
+000DCD  1  A5 01            lda ZP_PTR_1+1
+000DCF  1  69 00            adc #$0     ; increase the high byte
+000DD1  1  85 01            sta ZP_PTR_1+1
+000DD3  1  80 EC            bra @loop
+000DD5  1               @fieldptrdone:
+000DD5  1               
+000DD5  1  A0 02            ldy #2  ; index from payload pointer to width variable (low byte)
+000DD7  1  B1 00            lda (ZP_PTR_1),y
+000DD9  1  8D A9 08         sta fieldwidth
+000DDC  1  A0 04            ldy #4  ; index from payload pointer to height variable (low byte)
+000DDE  1  B1 00            lda (ZP_PTR_1),y
+000DE0  1  8D AA 08         sta fieldheight
+000DE3  1  A0 06            ldy #6  ; index from payload pointer to goals in this level (low byte)
+000DE5  1  B1 00            lda (ZP_PTR_1),y
+000DE7  1  8D A7 08         sta no_goals
+000DEA  1  A0 08            ldy #8  ; index from payload pointer to player offset in this level. Offset is non-zero based!
+000DEC  1               
+000DEC  1  38               sec
+000DED  1  B1 00            lda (ZP_PTR_1),y
+000DEF  1  E9 01            sbc #1
+000DF1  1  18               clc
+000DF2  1  69 00            adc #<RAMBANK
+000DF4  1  85 24            sta ZP_PTR_3
+000DF6  1  C8               iny
+000DF7  1  B1 00            lda (ZP_PTR_1),y
+000DF9  1  69 30            adc #>RAMBANK
+000DFB  1  85 25            sta ZP_PTR_3+1
+000DFD  1                   ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
+000DFD  1               
+000DFD  1                   ; now copy the field data to the RAM bank
+000DFD  1  AD AA 08         lda fieldheight
+000E00  1  AA               tax ; create counter
+000E01  1                   ; clear temp counter
+000E01  1  64 30            stz temp
+000E03  1  64 31            stz temp+1
+000E05  1               
+000E05  1               @multiply:
+000E05  1                   ; add fieldwidth variable to temp at each iteration - temp = temp + (width * height)
+000E05  1  A5 30            lda temp
+000E07  1  18               clc
+000E08  1  6D A9 08         adc fieldwidth
+000E0B  1  85 30            sta temp
+000E0D  1  A5 31            lda temp+1 ; don't forget the high byte
+000E0F  1  69 00            adc #0
+000E11  1  85 31            sta temp+1
+000E13  1  CA               dex
+000E14  1  D0 EF            bne @multiply
+000E16  1               
+000E16  1                   ; copy (temp) amount of bytes from current field pointer to Ram bank 0
+000E16  1               
+000E16  1                   ; currently ZP_PTR_1 is pointing to the selected field HEADER
+000E16  1                   ; retrieve the field pointer from it, and let ZP_PTR_FIELD to that
+000E16  1  A0 00            ldy #0
+000E18  1  B1 00            lda (ZP_PTR_1),y
+000E1A  1  85 28            sta ZP_PTR_FIELD
+000E1C  1  C8               iny
+000E1D  1  B1 00            lda (ZP_PTR_1),y
+000E1F  1  85 29            sta ZP_PTR_FIELD+1
+000E21  1                   ; now let this pointer start counting from LOADSTART, just as the offset in the input file references
+000E21  1  A5 28            lda ZP_PTR_FIELD
+000E23  1  18               clc
+000E24  1  69 92            adc #<LOADSTART
+000E26  1  85 28            sta ZP_PTR_FIELD
+000E28  1  A5 29            lda ZP_PTR_FIELD+1
+000E2A  1  69 27            adc #>LOADSTART
+000E2C  1  85 29            sta ZP_PTR_FIELD+1
+000E2E  1               
+000E2E  1                   ; set up destination pointer
+000E2E  1  A9 00            lda #<RAMBANK
+000E30  1  85 22            sta ZP_PTR_2
+000E32  1  A9 30            lda #>RAMBANK
+000E34  1  85 23            sta ZP_PTR_2+1
 000E36  1               
-000E36  1                   ; address to the tileset
-000E36  1  A9 80            lda #<titlescreen
-000E38  1  85 00            sta ZP_PTR_1
-000E3A  1  A9 10            lda #>titlescreen
-000E3C  1  85 01            sta ZP_PTR_1+1
-000E3E  1               
-000E3E  1               ;    ldy #0
-000E3E  1               ;@loop:
-000E3E  1               ;    lda (ZP_PTR_1),y
-000E3E  1               ;    clc
-000E3E  1               ;    adc #$1
-000E3E  1               ;    sta VERA_DATA0
-000E3E  1               ;    stz VERA_DATA0
-000E3E  1               ;    iny
-000E3E  1               ;    iny
-000E3E  1               ;    cpy #128
-000E3E  1               ;    bne @loop
-000E3E  1               
-000E3E  1  A0 40            ldy #64
-000E40  1               @outerloop:
-000E40  1  A2 40            ldx #64
-000E42  1               @innerloop:
-000E42  1  5A               phy
-000E43  1  A0 00            ldy #0
-000E45  1  B1 00            lda (ZP_PTR_1),y                    ; load byte from tileset
-000E47  1  D0 04            bne @else
-000E49  1               @brick:
-000E49  1  A9 01            lda #$1     ; brick tile
-000E4B  1  80 02            bra @next
-000E4D  1               @else:
-000E4D  1  A9 00            lda #$0     ; black tile
-000E4F  1               @next:
-000E4F  1  8D 23 9F         sta VERA_DATA0
-000E52  1  9C 23 9F         stz VERA_DATA0
-000E55  1  7A               ply
-000E56  1               
-000E56  1                   ; increase pointer to next byte in the set
-000E56  1  A5 00            lda ZP_PTR_1
-000E58  1  18               clc
-000E59  1  69 02            adc #$2
-000E5B  1  85 00            sta ZP_PTR_1
-000E5D  1  A5 01            lda ZP_PTR_1+1
-000E5F  1  69 00            adc #$0
-000E61  1  85 01            sta ZP_PTR_1+1
-000E63  1               
-000E63  1  CA               dex
-000E64  1  D0 DC            bne @innerloop
-000E66  1  88               dey
-000E67  1  D0 D7            bne @outerloop
-000E69  1               
-000E69  1  60               rts
-000E6A  1               
-000E6A  1               displayhelp:
-000E6A  1  18               clc ; go to x,y
-000E6B  1  A0 32            ldy #50
-000E6D  1  A2 17            ldx #23
+000E36  1  A0 00            ldy #0
+000E38  1               @copybyte:
+000E38  1                   ; copy one byte of data
+000E38  1  B1 28            lda (ZP_PTR_FIELD),y
+000E3A  1  91 22            sta (ZP_PTR_2),y
+000E3C  1               
+000E3C  1                   ; temp = temp -1
+000E3C  1  A5 30            lda temp
+000E3E  1  38               sec
+000E3F  1  E9 01            sbc #1
+000E41  1  85 30            sta temp
+000E43  1  A5 31            lda temp+1
+000E45  1  E9 00            sbc #0
+000E47  1  85 31            sta temp+1
+000E49  1               
+000E49  1                   ; if temp==0 done
+000E49  1  A5 31            lda temp+1
+000E4B  1  D0 06            bne @copynextbyte
+000E4D  1  A5 30            lda temp
+000E4F  1  D0 02            bne @copynextbyte
+000E51  1  80 1C            bra @done
+000E53  1               @copynextbyte:
+000E53  1  A5 28            lda ZP_PTR_FIELD
+000E55  1  18               clc
+000E56  1  69 01            adc #1
+000E58  1  85 28            sta ZP_PTR_FIELD
+000E5A  1  A5 29            lda ZP_PTR_FIELD+1
+000E5C  1  69 00            adc #0
+000E5E  1  85 29            sta ZP_PTR_FIELD+1
+000E60  1  A5 22            lda ZP_PTR_2
+000E62  1  18               clc
+000E63  1  69 01            adc #1
+000E65  1  85 22            sta ZP_PTR_2
+000E67  1  A5 23            lda ZP_PTR_2+1
+000E69  1  69 00            adc #0
+000E6B  1  85 23            sta ZP_PTR_2+1
+000E6D  1  80 C9            bra @copybyte
+000E6F  1               @done:
 000E6F  1               
-000E6F  1  20 F0 FF         jsr PLOT
-000E72  1  A9 51            lda #<help0
-000E74  1  85 00            sta ZP_PTR_1
-000E76  1  A9 08            lda #>help0
-000E78  1  85 01            sta ZP_PTR_1+1
-000E7A  1  20 1F 0C         jsr print
-000E7D  1               
-000E7D  1  A2 1E            ldx #30
-000E7F  1  20 F0 FF         jsr PLOT
-000E82  1  A9 5F            lda #<help1
-000E84  1  85 00            sta ZP_PTR_1
-000E86  1  A9 08            lda #>help1
-000E88  1  85 01            sta ZP_PTR_1+1
-000E8A  1  20 1F 0C         jsr print
-000E8D  1               
-000E8D  1  A2 20            ldx #32
-000E8F  1  20 F0 FF         jsr PLOT
-000E92  1  A9 73            lda #<help2
-000E94  1  85 00            sta ZP_PTR_1
-000E96  1  A9 08            lda #>help2
-000E98  1  85 01            sta ZP_PTR_1+1
-000E9A  1  20 1F 0C         jsr print
-000E9D  1               
-000E9D  1  A2 21            ldx #33
-000E9F  1  20 F0 FF         jsr PLOT
-000EA2  1  A9 89            lda #<help3
-000EA4  1  85 00            sta ZP_PTR_1
-000EA6  1  A9 08            lda #>help3
-000EA8  1  85 01            sta ZP_PTR_1+1
-000EAA  1  20 1F 0C         jsr print
-000EAD  1               
-000EAD  1  A2 22            ldx #34
-000EAF  1  20 F0 FF         jsr PLOT
-000EB2  1  A9 97            lda #<help4
-000EB4  1  85 00            sta ZP_PTR_1
-000EB6  1  A9 08            lda #>help4
-000EB8  1  85 01            sta ZP_PTR_1+1
-000EBA  1  20 1F 0C         jsr print
-000EBD  1  60               rts
-000EBE  1               
-000EBE  1               cleartiles:
-000EBE  1               ; Fill the Layer 0 with all zeros (black)
-000EBE  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000EC1  1  A9 10            lda #$10
-000EC3  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000EC6  1  A9 40            lda #$40
-000EC8  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-000ECB  1  A9 00            lda #$0
-000ECD  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-000ED0  1               
-000ED0  1  A9 00            lda #0
-000ED2  1  8D 23 9F         sta VERA_DATA0
-000ED5  1  8D 23 9F         sta VERA_DATA0
-000ED8  1               
-000ED8  1  A0 40            ldy #64
-000EDA  1  A9 00            lda #0
-000EDC  1  A2 40        :   ldx #64
-000EDE  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000EE1  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
-000EE4  1  CA               dex
-000EE5  1  D0 F7            bne :-
-000EE7  1  88               dey
-000EE8  1  D0 F2            bne :--
-000EEA  1               
-000EEA  1  60               rts
-000EEB  1               
-000EEB  1               layerconfig:
-000EEB  1               ; Configure Layer 0
-000EEB  1  A9 53            lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
-000EED  1  8D 2D 9F         sta $9F2D
-000EF0  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
-000EF2  1  8D 2E 9F         sta $9F2E                           ; Store to Map Base Pointer
-000EF5  1               
-000EF5  1  A9 93            lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
-000EF7  1  8D 2F 9F         sta $9F2F                           ; Store to Tile Base Pointer
-000EFA  1               
-000EFA  1               ; Fill the Layer 0 with all zeros (black)
-000EFA  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000EFD  1  A9 10            lda #$10
-000EFF  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000F02  1  A9 40            lda #$40
-000F04  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
-000F07  1  A9 00            lda #$0
-000F09  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
-000F0C  1               
-000F0C  1  A9 00            lda #0
-000F0E  1  8D 23 9F         sta VERA_DATA0
-000F11  1  8D 23 9F         sta VERA_DATA0
-000F14  1               
-000F14  1  A0 40            ldy #64
-000F16  1  A9 00            lda #0
-000F18  1  A2 40        :   ldx #64
-000F1A  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F1D  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
-000F20  1  CA               dex
-000F21  1  D0 F7            bne :-
-000F23  1  88               dey
-000F24  1  D0 F2            bne :--
-000F26  1               
-000F26  1               ; Turn on Layer 0
-000F26  1  AD 29 9F         lda $9F29
-000F29  1  09 30            ora #%00110000                      ; Bits 4 and 5 are set to 1
-000F2B  1  8D 29 9F         sta $9F29                           ; So both Later 0 and 1 are turned on
-000F2E  1               
-000F2E  1               ; Change Layer 1 to 256 Color Mode
-000F2E  1  AD 34 9F         lda $9F34
-000F31  1  09 08            ora #%001000                        ; Set bit 3 to 1, rest unchanged
-000F33  1  8D 34 9F         sta $9F34
+000E6F  1                   ; prep the field pointer
+000E6F  1  A9 00            lda #<RAMBANK
+000E71  1  85 28            sta ZP_PTR_FIELD
+000E73  1  A9 30            lda #>RAMBANK
+000E75  1  85 29            sta ZP_PTR_FIELD+1
+000E77  1  60               rts
+000E78  1               
+000E78  1               printfield:
+000E78  1                   ; no clearscreen, just print the field to screen on current position
+000E78  1                   ; depends only on
+000E78  1                   ; - field label for start of field
+000E78  1               
+000E78  1  A5 28            lda ZP_PTR_FIELD
+000E7A  1  85 00            sta ZP_PTR_1
+000E7C  1  A5 29            lda ZP_PTR_FIELD+1
+000E7E  1  85 01            sta ZP_PTR_1+1
+000E80  1  A2 00            ldx #0 ; row counter
+000E82  1               @nextrow:
+000E82  1  A0 00            ldy #0 ; column counter
+000E84  1               @row:
+000E84  1  B1 00            lda (ZP_PTR_1),y
+000E86  1  C9 40            cmp #'@'
+000E88  1  F0 06            beq @character
+000E8A  1  C9 2B            cmp #'+'
+000E8C  1  F0 02            beq @character
+000E8E  1  80 17            bra @normalcolor
+000E90  1               @character:
+000E90  1  48               pha
+000E91  1  A9 9E            lda #$9e ; YELLOW
+000E93  1  20 D2 FF         jsr CHROUT
+000E96  1  68               pla
+000E97  1  20 D2 FF         jsr CHROUT
+000E9A  1  A9 05            lda #$05 ; WHITE
+000E9C  1  20 D2 FF         jsr CHROUT
+000E9F  1  C8               iny
+000EA0  1  CC A9 08         cpy fieldwidth
+000EA3  1  D0 DF            bne @row
+000EA5  1  80 09            bra @endline
+000EA7  1               @normalcolor:
+000EA7  1  20 D2 FF         jsr CHROUT
+000EAA  1  C8               iny
+000EAB  1  CC A9 08         cpy fieldwidth
+000EAE  1  D0 D4            bne @row
+000EB0  1               @endline:
+000EB0  1  A9 0D            lda #NEWLINE
+000EB2  1  20 D2 FF         jsr CHROUT
+000EB5  1               
+000EB5  1                   ; advance pointer to next row
+000EB5  1  A5 00            lda ZP_PTR_1
+000EB7  1  18               clc
+000EB8  1  6D A9 08         adc fieldwidth
+000EBB  1  85 00            sta ZP_PTR_1
+000EBD  1  90 07            bcc @checklastrow ; no carry, don't increment high byte on pointer
+000EBF  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+000EC1  1  18               clc
+000EC2  1  69 01            adc #1
+000EC4  1  85 01            sta ZP_PTR_1+1
+000EC6  1               @checklastrow:
+000EC6  1                   ; last row?
+000EC6  1  E8               inx
+000EC7  1  EC AA 08         cpx fieldheight
+000ECA  1  D0 B6            bne @nextrow
+000ECC  1               
+000ECC  1                   ; print quit message at the end of the field
+000ECC  1  A9 0D            lda #NEWLINE
+000ECE  1  20 D2 FF         jsr CHROUT
+000ED1  1  A9 31            lda #<quitmessage
+000ED3  1  85 00            sta ZP_PTR_1
+000ED5  1  A9 08            lda #>quitmessage
+000ED7  1  85 01            sta ZP_PTR_1+1
+000ED9  1  20 2E 0C         jsr printline
+000EDC  1               
+000EDC  1  60               rts
+000EDD  1               
+000EDD  1               cls:
+000EDD  1  A9 93            lda #CLEARSCREEN
+000EDF  1  20 D2 FF         jsr CHROUT
+000EE2  1  60               rts
+000EE3  1               
+000EE3  1               loadtiles:
+000EE3  1               ; Build  16x16 256 color tiles in VRAM location $12000
+000EE3  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+000EE6  1  A9 11            lda #$11
+000EE8  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
+000EEB  1  A9 20            lda #$20
+000EED  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $20
+000EF0  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
+000EF3  1               
+000EF3  1  A2 00            ldx #0
+000EF5  1  BD 92 21     :   lda tiledata,x                      ; index 0 / black tile
+000EF8  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000EFB  1  E8               inx
+000EFC  1  D0 F7            bne :-
+000EFE  1                   ; load Brick data
+000EFE  1  A2 00            ldx #0
+000F00  1  BD 92 22     :   lda Brick,x                         ; index 1 / brick
+000F03  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F06  1  E8               inx
+000F07  1  D0 F7            bne :-
+000F09  1                   ; load player data
+000F09  1  A2 00            ldx #0
+000F0B  1  BD 92 23     :   lda player,x                        ; index 2 / player
+000F0E  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F11  1  E8               inx
+000F12  1  D0 F7            bne :-
+000F14  1                   ; load crate data
+000F14  1  A2 00            ldx #0
+000F16  1  BD 92 24     :   lda crate,x                         ; index 3 / crate (normal)
+000F19  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F1C  1  E8               inx
+000F1D  1  D0 F7            bne :-
+000F1F  1                   ; load goal data
+000F1F  1  A2 00            ldx #0
+000F21  1  BD 92 25     :   lda goal,x                         ; index 4 / goal (normal)
+000F24  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F27  1  E8               inx
+000F28  1  D0 F7            bne :-
+000F2A  1                   ; load crateongoal data
+000F2A  1  A2 00            ldx #0
+000F2C  1  BD 92 26     :   lda crateongoal,x                   ; index 5 / crate on goal
+000F2F  1  8D 23 9F         sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000F32  1  E8               inx
+000F33  1  D0 F7            bne :-
+000F35  1               
+000F35  1  60               rts
 000F36  1               
-000F36  1               ; Clear Layer 1
+000F36  1               displaytitlescreen:
+000F36  1               
+000F36  1               ; Fill the Layer 0 with the titlescreen tileset
 000F36  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
 000F39  1  A9 10            lda #$10
 000F3B  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000F3E  1  9C 21 9F         stz VERA_MID                        ; Set Middle Byte to $00
-000F41  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
-000F44  1               
-000F44  1  A9 1E            lda #30
-000F46  1  85 02            sta $02                             ; save counter for rows
-000F48  1  A0 01            ldy #$01                            ; Color Attribute white on black background
-000F4A  1  A9 20            lda #$20                            ; Blank character
-000F4C  1  A2 00            ldx #0
-000F4E  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-000F51  1  8C 23 9F         sty VERA_DATA0                      ; Write Attribute
-000F54  1  E8               inx
-000F55  1  D0 F7            bne :-
-000F57  1  C6 02            dec $02
-000F59  1  D0 F3            bne :-
-000F5B  1               
-000F5B  1               ; Scale Display x2 for resolution of 320 x 240 pixels
-000F5B  1               ;    lda #$40
-000F5B  1               ;    sta $9F2A
-000F5B  1               ;    sta $9F2B
-000F5B  1               
-000F5B  1  60               rts
-000F5C  1               
-000F5C  1               printfield2:
-000F5C  1               ; prep variables for vera med/high bytes
-000F5C  1               ;    topleft address for first tile is 0x04000
-000F5C  1  A9 40            lda #$40
-000F5E  1  8D AC 08         sta vera_byte_mid
-000F61  1  9C AB 08         stz vera_byte_low
-000F64  1               
-000F64  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
-000F64  1  A9 28            lda #SCREENWIDTH
-000F66  1  38               sec
-000F67  1  ED A9 08         sbc fieldwidth
-000F6A  1  4A               lsr ; /2
-000F6B  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
-000F6C  1  8D AB 08         sta vera_byte_low
-000F6F  1               
-000F6F  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
-000F6F  1  A9 1E            lda #SCREENHEIGHT
-000F71  1  38               sec
-000F72  1  ED AA 08         sbc fieldheight
-000F75  1  4A               lsr ; /2
-000F76  1  AA               tax ; transfer number of rows down to counter
-000F77  1               @loop:
-000F77  1  E0 00            cpx #$0 ; any rows down (left)?
-000F79  1  F0 16            beq @done ; exit loop when x == 0
-000F7B  1                   ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
-000F7B  1  AD AB 08         lda vera_byte_low
-000F7E  1  18               clc
-000F7F  1  69 80            adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
-000F81  1  8D AB 08         sta vera_byte_low
-000F84  1  90 08            bcc @decrement  ; no need to change the high byte
-000F86  1  AD AC 08         lda vera_byte_mid
-000F89  1  69 00            adc #$0     ; add carry (so +1)
-000F8B  1  8D AC 08         sta vera_byte_mid
-000F8E  1               @decrement: ; next row
-000F8E  1  CA               dex
-000F8F  1  80 E6            bra @loop
-000F91  1               @done:
-000F91  1               
-000F91  1               ; prepare the pointers to the back-end field data, so we know what to display
-000F91  1  A5 28            lda ZP_PTR_FIELD
-000F93  1  85 00            sta ZP_PTR_1
-000F95  1  A5 29            lda ZP_PTR_FIELD+1
-000F97  1  85 01            sta ZP_PTR_1+1
-000F99  1               
-000F99  1               ; start displaying the selected field
-000F99  1               ; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
-000F99  1  A2 00            ldx #0 ; row counter
-000F9B  1               @nextrow:
-000F9B  1  A0 00            ldy #0 ; column counter
-000F9D  1                   ; prepare vera pointers for this row
-000F9D  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
-000FA0  1  A9 10            lda #$10
-000FA2  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-000FA5  1  AD AC 08         lda vera_byte_mid
-000FA8  1  8D 21 9F         sta VERA_MID
-000FAB  1  AD AB 08         lda vera_byte_low
-000FAE  1  8D 20 9F         sta VERA_LOW
-000FB1  1               
-000FB1  1               @row:
-000FB1  1                   ; sweep the field, row by row, indexed by column y
-000FB1  1  B1 00            lda (ZP_PTR_1),y
-000FB3  1  C9 40            cmp #'@'
-000FB5  1  F0 2A            beq @player
-000FB7  1  C9 2B            cmp #'+'
-000FB9  1  F0 26            beq @player
-000FBB  1  C9 24            cmp #'$'
-000FBD  1  F0 32            beq @crate
-000FBF  1  C9 2E            cmp #'.'
-000FC1  1  F0 4E            beq @goal
-000FC3  1  C9 2A            cmp #'*'
-000FC5  1  F0 3A            beq @crateongoal
-000FC7  1  C9 20            cmp #' '
-000FC9  1  F0 06            beq @ignore
-000FCB  1  C9 00            cmp #0
-000FCD  1  F0 02            beq @ignore
-000FCF  1  80 50            bra @wall
-000FD1  1               @ignore:
-000FD1  1                   ; ignore
-000FD1  1  A9 00            lda #$0 ; black tile
-000FD3  1  8D 23 9F         sta VERA_DATA0
-000FD6  1  9C 23 9F         stz VERA_DATA0
-000FD9  1  C8               iny
-000FDA  1  CC A9 08         cpy fieldwidth
-000FDD  1  D0 D2            bne @row
-000FDF  1  80 4E            bra @endline
-000FE1  1               @player:
-000FE1  1  A9 02            lda #$2
-000FE3  1  8D 23 9F         sta VERA_DATA0
-000FE6  1  9C 23 9F         stz VERA_DATA0
-000FE9  1  C8               iny
-000FEA  1  CC A9 08         cpy fieldwidth
-000FED  1  D0 C2            bne @row
-000FEF  1  80 3E            bra @endline
-000FF1  1               @crate:
-000FF1  1  A9 03            lda #$3
-000FF3  1  8D 23 9F         sta VERA_DATA0
-000FF6  1  9C 23 9F         stz VERA_DATA0
-000FF9  1  C8               iny
-000FFA  1  CC A9 08         cpy fieldwidth
-000FFD  1  D0 B2            bne @row
-000FFF  1  80 2E            bra @endline
-001001  1               @crateongoal:
-001001  1  A9 05            lda #$5
-001003  1  8D 23 9F         sta VERA_DATA0
-001006  1  9C 23 9F         stz VERA_DATA0
-001009  1  C8               iny
-00100A  1  CC A9 08         cpy fieldwidth
-00100D  1  D0 A2            bne @row
-00100F  1  80 1E            bra @endline
-001011  1               @goal:
-001011  1  A9 04            lda #$4
-001013  1  8D 23 9F         sta VERA_DATA0
-001016  1  9C 23 9F         stz VERA_DATA0
-001019  1  C8               iny
-00101A  1  CC A9 08         cpy fieldwidth
-00101D  1  D0 92            bne @row
-00101F  1  80 0E            bra @endline
-001021  1               
-001021  1               @wall:
-001021  1  A9 01            lda #$1 ; load tile 1 ; brick
+000F3E  1  A9 40            lda #$40
+000F40  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+000F43  1  A9 00            lda #$0
+000F45  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+000F48  1               
+000F48  1                   ; address to the tileset
+000F48  1  A9 92            lda #<titlescreen
+000F4A  1  85 00            sta ZP_PTR_1
+000F4C  1  A9 11            lda #>titlescreen
+000F4E  1  85 01            sta ZP_PTR_1+1
+000F50  1               
+000F50  1               ;    ldy #0
+000F50  1               ;@loop:
+000F50  1               ;    lda (ZP_PTR_1),y
+000F50  1               ;    clc
+000F50  1               ;    adc #$1
+000F50  1               ;    sta VERA_DATA0
+000F50  1               ;    stz VERA_DATA0
+000F50  1               ;    iny
+000F50  1               ;    iny
+000F50  1               ;    cpy #128
+000F50  1               ;    bne @loop
+000F50  1               
+000F50  1  A0 40            ldy #64
+000F52  1               @outerloop:
+000F52  1  A2 40            ldx #64
+000F54  1               @innerloop:
+000F54  1  5A               phy
+000F55  1  A0 00            ldy #0
+000F57  1  B1 00            lda (ZP_PTR_1),y                    ; load byte from tileset
+000F59  1  D0 04            bne @else
+000F5B  1               @brick:
+000F5B  1  A9 01            lda #$1     ; brick tile
+000F5D  1  80 02            bra @next
+000F5F  1               @else:
+000F5F  1  A9 00            lda #$0     ; black tile
+000F61  1               @next:
+000F61  1  8D 23 9F         sta VERA_DATA0
+000F64  1  9C 23 9F         stz VERA_DATA0
+000F67  1  7A               ply
+000F68  1               
+000F68  1                   ; increase pointer to next byte in the set
+000F68  1  A5 00            lda ZP_PTR_1
+000F6A  1  18               clc
+000F6B  1  69 02            adc #$2
+000F6D  1  85 00            sta ZP_PTR_1
+000F6F  1  A5 01            lda ZP_PTR_1+1
+000F71  1  69 00            adc #$0
+000F73  1  85 01            sta ZP_PTR_1+1
+000F75  1               
+000F75  1  CA               dex
+000F76  1  D0 DC            bne @innerloop
+000F78  1  88               dey
+000F79  1  D0 D7            bne @outerloop
+000F7B  1               
+000F7B  1  60               rts
+000F7C  1               
+000F7C  1               displayhelp:
+000F7C  1  18               clc ; go to x,y
+000F7D  1  A0 32            ldy #50
+000F7F  1  A2 17            ldx #23
+000F81  1               
+000F81  1  20 F0 FF         jsr PLOT
+000F84  1  A9 51            lda #<help0
+000F86  1  85 00            sta ZP_PTR_1
+000F88  1  A9 08            lda #>help0
+000F8A  1  85 01            sta ZP_PTR_1+1
+000F8C  1  20 1F 0C         jsr print
+000F8F  1               
+000F8F  1  A2 1E            ldx #30
+000F91  1  20 F0 FF         jsr PLOT
+000F94  1  A9 5F            lda #<help1
+000F96  1  85 00            sta ZP_PTR_1
+000F98  1  A9 08            lda #>help1
+000F9A  1  85 01            sta ZP_PTR_1+1
+000F9C  1  20 1F 0C         jsr print
+000F9F  1               
+000F9F  1  A2 20            ldx #32
+000FA1  1  20 F0 FF         jsr PLOT
+000FA4  1  A9 73            lda #<help2
+000FA6  1  85 00            sta ZP_PTR_1
+000FA8  1  A9 08            lda #>help2
+000FAA  1  85 01            sta ZP_PTR_1+1
+000FAC  1  20 1F 0C         jsr print
+000FAF  1               
+000FAF  1  A2 21            ldx #33
+000FB1  1  20 F0 FF         jsr PLOT
+000FB4  1  A9 89            lda #<help3
+000FB6  1  85 00            sta ZP_PTR_1
+000FB8  1  A9 08            lda #>help3
+000FBA  1  85 01            sta ZP_PTR_1+1
+000FBC  1  20 1F 0C         jsr print
+000FBF  1               
+000FBF  1  A2 22            ldx #34
+000FC1  1  20 F0 FF         jsr PLOT
+000FC4  1  A9 97            lda #<help4
+000FC6  1  85 00            sta ZP_PTR_1
+000FC8  1  A9 08            lda #>help4
+000FCA  1  85 01            sta ZP_PTR_1+1
+000FCC  1  20 1F 0C         jsr print
+000FCF  1  60               rts
+000FD0  1               
+000FD0  1               cleartiles:
+000FD0  1               ; Fill the Layer 0 with all zeros (black)
+000FD0  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+000FD3  1  A9 10            lda #$10
+000FD5  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+000FD8  1  A9 40            lda #$40
+000FDA  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+000FDD  1  A9 00            lda #$0
+000FDF  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+000FE2  1               
+000FE2  1  A9 00            lda #0
+000FE4  1  8D 23 9F         sta VERA_DATA0
+000FE7  1  8D 23 9F         sta VERA_DATA0
+000FEA  1               
+000FEA  1  A0 40            ldy #64
+000FEC  1  A9 00            lda #0
+000FEE  1  A2 40        :   ldx #64
+000FF0  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+000FF3  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
+000FF6  1  CA               dex
+000FF7  1  D0 F7            bne :-
+000FF9  1  88               dey
+000FFA  1  D0 F2            bne :--
+000FFC  1               
+000FFC  1  60               rts
+000FFD  1               
+000FFD  1               layerconfig:
+000FFD  1               ; Configure Layer 0
+000FFD  1  A9 53            lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
+000FFF  1  8D 2D 9F         sta $9F2D
+001002  1  A9 20            lda #$20                            ; $20 points to $4000 in VRAM
+001004  1  8D 2E 9F         sta $9F2E                           ; Store to Map Base Pointer
+001007  1               
+001007  1  A9 93            lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
+001009  1  8D 2F 9F         sta $9F2F                           ; Store to Tile Base Pointer
+00100C  1               
+00100C  1               ; Fill the Layer 0 with all zeros (black)
+00100C  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+00100F  1  A9 10            lda #$10
+001011  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+001014  1  A9 40            lda #$40
+001016  1  8D 21 9F         sta VERA_MID                        ; Set Middle Byte to $40
+001019  1  A9 00            lda #$0
+00101B  1  8D 20 9F         sta VERA_LOW                        ; Set Low Byte to $00
+00101E  1               
+00101E  1  A9 00            lda #0
+001020  1  8D 23 9F         sta VERA_DATA0
 001023  1  8D 23 9F         sta VERA_DATA0
-001026  1  9C 23 9F         stz VERA_DATA0
-001029  1               
-001029  1  C8               iny
-00102A  1  CC A9 08         cpy fieldwidth
-00102D  1  D0 82            bne @row
-00102F  1               @endline:
-00102F  1                   ; advance pointer to next row in the field
-00102F  1  A5 00            lda ZP_PTR_1
-001031  1  18               clc
-001032  1  6D A9 08         adc fieldwidth
-001035  1  85 00            sta ZP_PTR_1
-001037  1  90 06            bcc @checklastrow ; no carry, don't increment high byte on pointer
-001039  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-00103B  1  69 00            adc #0
-00103D  1  85 01            sta ZP_PTR_1+1
-00103F  1               @checklastrow:
-00103F  1                   ; last row?
-00103F  1                   ; increment vera pointer to next row
-00103F  1  AD AB 08         lda vera_byte_low
-001042  1  18               clc
-001043  1  69 80            adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
-001045  1  8D AB 08         sta vera_byte_low
-001048  1  90 08            bcc @next3  ; no need to change the high byte
-00104A  1  AD AC 08         lda vera_byte_mid
-00104D  1  69 00            adc #$0     ; add carry (so +1)
-00104F  1  8D AC 08         sta vera_byte_mid
-001052  1               @next3:
-001052  1  E8               inx
-001053  1  EC AA 08         cpx fieldheight
-001056  1  F0 03            beq @nextsection
-001058  1               
-001058  1  4C 9B 0F         jmp @nextrow
-00105B  1               @nextsection:
-00105B  1  60               rts
-00105C  1               
-00105C  1               printdecimal2:
-00105C  1                   ; on entry A = value to print to standard out
-00105C  1  A2 FF            ldx #$ff
-00105E  1  38               sec
-00105F  1               @prdec100:
-00105F  1  E8               inx
-001060  1  E9 64            sbc #100
-001062  1  B0 FB            bcs @prdec100
-001064  1  69 64            adc #100
-001066  1  20 77 10         jsr @prdecdigit
-001069  1  A2 FF            ldx #$ff
-00106B  1  38               sec
-00106C  1               @prdec10:
-00106C  1  E8               inx
-00106D  1  E9 0A            sbc #10
-00106F  1  B0 FB            bcs @prdec10
-001071  1  69 0A            adc #10
-001073  1  20 77 10         jsr @prdecdigit
-001076  1  AA               tax
-001077  1               @prdecdigit:
-001077  1  48               pha
-001078  1  8A               txa
-001079  1  09 30            ora #'0'
-00107B  1  20 D2 FF         jsr CHROUT
-00107E  1  68               pla
-00107F  1  60               rts
-001080  1               
-001080  1               titlescreen:
-001080  1  FF 03 00 00  .incbin "tiles/titlescreen.bin"
-001084  1  00 00 00 00  
-001088  1  FF 03 FF 03  
-002080  1               
-002080  1               tiledata:
-002080  1               black:
-002080  1  00 00 00 00  .incbin "tiles/black.bin"
-002084  1  00 00 00 00  
-002088  1  00 00 00 00  
-002180  1               Brick:
-002180  1  08 08 08 08  .incbin "tiles/brick.bin"
-002184  1  08 08 08 E5  
-002188  1  08 08 08 08  
-002280  1               player:
-002280  1  00 00 00 00  .incbin "tiles/player.bin"
-002284  1  00 10 10 10  
-002288  1  10 0B 00 00  
-002380  1               crate:
-002380  1  57 57 57 57  .incbin "tiles/crate.bin"
-002384  1  57 57 57 57  
-002388  1  57 57 57 57  
-002480  1               goal:
-002480  1  00 00 00 00  .incbin "tiles/goal.bin"
-002484  1  00 00 00 00  
-002488  1  00 00 00 00  
-002580  1               crateongoal:
-002580  1  57 57 57 57  .incbin "tiles/crateongoal.bin"
-002584  1  57 57 57 57  
-002588  1  57 57 57 57  
-002680  1               LOADSTART:
-002680  1  32 00 F6 01  .incbin "levels.bin"
-002684  1  13 00 0B 00  
-002688  1  06 00 99 02  
-002680  1               
+001026  1               
+001026  1  A0 40            ldy #64
+001028  1  A9 00            lda #0
+00102A  1  A2 40        :   ldx #64
+00102C  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+00102F  1  8D 23 9F         sta VERA_DATA0                      ; Write Attribute
+001032  1  CA               dex
+001033  1  D0 F7            bne :-
+001035  1  88               dey
+001036  1  D0 F2            bne :--
+001038  1               
+001038  1               ; Turn on Layer 0
+001038  1  AD 29 9F         lda $9F29
+00103B  1  09 30            ora #%00110000                      ; Bits 4 and 5 are set to 1
+00103D  1  8D 29 9F         sta $9F29                           ; So both Later 0 and 1 are turned on
+001040  1               
+001040  1               ; Change Layer 1 to 256 Color Mode
+001040  1  AD 34 9F         lda $9F34
+001043  1  09 08            ora #%001000                        ; Set bit 3 to 1, rest unchanged
+001045  1  8D 34 9F         sta $9F34
+001048  1               
+001048  1               ; Clear Layer 1
+001048  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+00104B  1  A9 10            lda #$10
+00104D  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+001050  1  9C 21 9F         stz VERA_MID                        ; Set Middle Byte to $00
+001053  1  9C 20 9F         stz VERA_LOW                        ; Set Low Byte to $00
+001056  1               
+001056  1  A9 1E            lda #30
+001058  1  85 02            sta $02                             ; save counter for rows
+00105A  1  A0 01            ldy #$01                            ; Color Attribute white on black background
+00105C  1  A9 20            lda #$20                            ; Blank character
+00105E  1  A2 00            ldx #0
+001060  1  8D 23 9F     :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
+001063  1  8C 23 9F         sty VERA_DATA0                      ; Write Attribute
+001066  1  E8               inx
+001067  1  D0 F7            bne :-
+001069  1  C6 02            dec $02
+00106B  1  D0 F3            bne :-
+00106D  1               
+00106D  1               ; Scale Display x2 for resolution of 320 x 240 pixels
+00106D  1               ;    lda #$40
+00106D  1               ;    sta $9F2A
+00106D  1               ;    sta $9F2B
+00106D  1               
+00106D  1  60               rts
+00106E  1               
+00106E  1               printfield2:
+00106E  1               ; prep variables for vera med/high bytes
+00106E  1               ;    topleft address for first tile is 0x04000
+00106E  1  A9 40            lda #$40
+001070  1  8D AC 08         sta vera_byte_mid
+001073  1  9C AB 08         stz vera_byte_low
+001076  1               
+001076  1               ; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
+001076  1  A9 28            lda #SCREENWIDTH
+001078  1  38               sec
+001079  1  ED A9 08         sbc fieldwidth
+00107C  1  4A               lsr ; /2
+00107D  1  0A               asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP
+00107E  1  8D AB 08         sta vera_byte_low
+001081  1               
+001081  1               ; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
+001081  1  A9 1E            lda #SCREENHEIGHT
+001083  1  38               sec
+001084  1  ED AA 08         sbc fieldheight
+001087  1  4A               lsr ; /2
+001088  1  AA               tax ; transfer number of rows down to counter
+001089  1               @loop:
+001089  1  E0 00            cpx #$0 ; any rows down (left)?
+00108B  1  F0 16            beq @done ; exit loop when x == 0
+00108D  1                   ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
+00108D  1  AD AB 08         lda vera_byte_low
+001090  1  18               clc
+001091  1  69 80            adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
+001093  1  8D AB 08         sta vera_byte_low
+001096  1  90 08            bcc @decrement  ; no need to change the high byte
+001098  1  AD AC 08         lda vera_byte_mid
+00109B  1  69 00            adc #$0     ; add carry (so +1)
+00109D  1  8D AC 08         sta vera_byte_mid
+0010A0  1               @decrement: ; next row
+0010A0  1  CA               dex
+0010A1  1  80 E6            bra @loop
+0010A3  1               @done:
+0010A3  1               
+0010A3  1               ; prepare the pointers to the back-end field data, so we know what to display
+0010A3  1  A5 28            lda ZP_PTR_FIELD
+0010A5  1  85 00            sta ZP_PTR_1
+0010A7  1  A5 29            lda ZP_PTR_FIELD+1
+0010A9  1  85 01            sta ZP_PTR_1+1
+0010AB  1               
+0010AB  1               ; start displaying the selected field
+0010AB  1               ; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
+0010AB  1  A2 00            ldx #0 ; row counter
+0010AD  1               @nextrow:
+0010AD  1  A0 00            ldy #0 ; column counter
+0010AF  1                   ; prepare vera pointers for this row
+0010AF  1  9C 25 9F         stz VERA_CTRL                       ; Use Data Register 0
+0010B2  1  A9 10            lda #$10
+0010B4  1  8D 22 9F         sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+0010B7  1  AD AC 08         lda vera_byte_mid
+0010BA  1  8D 21 9F         sta VERA_MID
+0010BD  1  AD AB 08         lda vera_byte_low
+0010C0  1  8D 20 9F         sta VERA_LOW
+0010C3  1               
+0010C3  1               @row:
+0010C3  1                   ; sweep the field, row by row, indexed by column y
+0010C3  1  B1 00            lda (ZP_PTR_1),y
+0010C5  1  C9 40            cmp #'@'
+0010C7  1  F0 2A            beq @player
+0010C9  1  C9 2B            cmp #'+'
+0010CB  1  F0 26            beq @player
+0010CD  1  C9 24            cmp #'$'
+0010CF  1  F0 32            beq @crate
+0010D1  1  C9 2E            cmp #'.'
+0010D3  1  F0 4E            beq @goal
+0010D5  1  C9 2A            cmp #'*'
+0010D7  1  F0 3A            beq @crateongoal
+0010D9  1  C9 20            cmp #' '
+0010DB  1  F0 06            beq @ignore
+0010DD  1  C9 00            cmp #0
+0010DF  1  F0 02            beq @ignore
+0010E1  1  80 50            bra @wall
+0010E3  1               @ignore:
+0010E3  1                   ; ignore
+0010E3  1  A9 00            lda #$0 ; black tile
+0010E5  1  8D 23 9F         sta VERA_DATA0
+0010E8  1  9C 23 9F         stz VERA_DATA0
+0010EB  1  C8               iny
+0010EC  1  CC A9 08         cpy fieldwidth
+0010EF  1  D0 D2            bne @row
+0010F1  1  80 4E            bra @endline
+0010F3  1               @player:
+0010F3  1  A9 02            lda #$2
+0010F5  1  8D 23 9F         sta VERA_DATA0
+0010F8  1  9C 23 9F         stz VERA_DATA0
+0010FB  1  C8               iny
+0010FC  1  CC A9 08         cpy fieldwidth
+0010FF  1  D0 C2            bne @row
+001101  1  80 3E            bra @endline
+001103  1               @crate:
+001103  1  A9 03            lda #$3
+001105  1  8D 23 9F         sta VERA_DATA0
+001108  1  9C 23 9F         stz VERA_DATA0
+00110B  1  C8               iny
+00110C  1  CC A9 08         cpy fieldwidth
+00110F  1  D0 B2            bne @row
+001111  1  80 2E            bra @endline
+001113  1               @crateongoal:
+001113  1  A9 05            lda #$5
+001115  1  8D 23 9F         sta VERA_DATA0
+001118  1  9C 23 9F         stz VERA_DATA0
+00111B  1  C8               iny
+00111C  1  CC A9 08         cpy fieldwidth
+00111F  1  D0 A2            bne @row
+001121  1  80 1E            bra @endline
+001123  1               @goal:
+001123  1  A9 04            lda #$4
+001125  1  8D 23 9F         sta VERA_DATA0
+001128  1  9C 23 9F         stz VERA_DATA0
+00112B  1  C8               iny
+00112C  1  CC A9 08         cpy fieldwidth
+00112F  1  D0 92            bne @row
+001131  1  80 0E            bra @endline
+001133  1               
+001133  1               @wall:
+001133  1  A9 01            lda #$1 ; load tile 1 ; brick
+001135  1  8D 23 9F         sta VERA_DATA0
+001138  1  9C 23 9F         stz VERA_DATA0
+00113B  1               
+00113B  1  C8               iny
+00113C  1  CC A9 08         cpy fieldwidth
+00113F  1  D0 82            bne @row
+001141  1               @endline:
+001141  1                   ; advance pointer to next row in the field
+001141  1  A5 00            lda ZP_PTR_1
+001143  1  18               clc
+001144  1  6D A9 08         adc fieldwidth
+001147  1  85 00            sta ZP_PTR_1
+001149  1  90 06            bcc @checklastrow ; no carry, don't increment high byte on pointer
+00114B  1  A5 01            lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+00114D  1  69 00            adc #0
+00114F  1  85 01            sta ZP_PTR_1+1
+001151  1               @checklastrow:
+001151  1                   ; last row?
+001151  1                   ; increment vera pointer to next row
+001151  1  AD AB 08         lda vera_byte_low
+001154  1  18               clc
+001155  1  69 80            adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
+001157  1  8D AB 08         sta vera_byte_low
+00115A  1  90 08            bcc @next3  ; no need to change the high byte
+00115C  1  AD AC 08         lda vera_byte_mid
+00115F  1  69 00            adc #$0     ; add carry (so +1)
+001161  1  8D AC 08         sta vera_byte_mid
+001164  1               @next3:
+001164  1  E8               inx
+001165  1  EC AA 08         cpx fieldheight
+001168  1  F0 03            beq @nextsection
+00116A  1               
+00116A  1  4C AD 10         jmp @nextrow
+00116D  1               @nextsection:
+00116D  1  60               rts
+00116E  1               
+00116E  1               printdecimal2:
+00116E  1                   ; on entry A = value to print to standard out
+00116E  1  A2 FF            ldx #$ff
+001170  1  38               sec
+001171  1               @prdec100:
+001171  1  E8               inx
+001172  1  E9 64            sbc #100
+001174  1  B0 FB            bcs @prdec100
+001176  1  69 64            adc #100
+001178  1  20 89 11         jsr @prdecdigit
+00117B  1  A2 FF            ldx #$ff
+00117D  1  38               sec
+00117E  1               @prdec10:
+00117E  1  E8               inx
+00117F  1  E9 0A            sbc #10
+001181  1  B0 FB            bcs @prdec10
+001183  1  69 0A            adc #10
+001185  1  20 89 11         jsr @prdecdigit
+001188  1  AA               tax
+001189  1               @prdecdigit:
+001189  1  48               pha
+00118A  1  8A               txa
+00118B  1  09 30            ora #'0'
+00118D  1  20 D2 FF         jsr CHROUT
+001190  1  68               pla
+001191  1  60               rts
+001192  1               
+001192  1               titlescreen:
+001192  1  FF 03 00 00  .incbin "tiles/titlescreen.bin"
+001196  1  00 00 00 00  
+00119A  1  FF 03 FF 03  
+002192  1               
+002192  1               tiledata:
+002192  1               black:
+002192  1  00 00 00 00  .incbin "tiles/black.bin"
+002196  1  00 00 00 00  
+00219A  1  00 00 00 00  
+002292  1               Brick:
+002292  1  08 08 08 08  .incbin "tiles/brick.bin"
+002296  1  08 08 08 E5  
+00229A  1  08 08 08 08  
+002392  1               player:
+002392  1  00 00 00 00  .incbin "tiles/player.bin"
+002396  1  00 10 10 10  
+00239A  1  10 0B 00 00  
+002492  1               crate:
+002492  1  57 57 57 57  .incbin "tiles/crate.bin"
+002496  1  57 57 57 57  
+00249A  1  57 57 57 57  
+002592  1               goal:
+002592  1  00 00 00 00  .incbin "tiles/goal.bin"
+002596  1  00 00 00 00  
+00259A  1  00 00 00 00  
+002692  1               crateongoal:
+002692  1  57 57 57 57  .incbin "tiles/crateongoal.bin"
+002696  1  57 57 57 57  
+00269A  1  57 57 57 57  
+002792  1               LOADSTART:
+002792  1  32 00 F6 01  .incbin "levels.bin"
+002796  1  13 00 0B 00  
+00279A  1  06 00 A4 00  
+002792  1               

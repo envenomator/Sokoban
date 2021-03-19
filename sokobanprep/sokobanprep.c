@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
                     fieldptr += previouspayloadsize;
                 }
 
-                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
+//                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
                 fprintf(outptr,"%c%c",(char)fieldptr,(char)(fieldptr>>8));
                 fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
                 fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));

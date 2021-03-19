@@ -6,10 +6,10 @@ UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 10
 MAXUNDO = 10
-
-; screen 16x16bit tile width/height
-SCREENWIDTH = 40
+SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
 SCREENHEIGHT = 30
+RAMBANK = $3000         ; Ram Bank 0
+
 .org $080D
 .segment "STARTUP"
 .segment "INIT"
@@ -63,6 +63,7 @@ start:
     lda #UPPERCASE
     jsr CHROUT
 
+;    jsr levels_to_rambank   ; copy level data to the ram bank first
     jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
@@ -893,6 +894,136 @@ resetvars:
     stz undocounter
     rts
 
+level_to_rambank:
+    ; copy selected level data to Ram bank 0
+    ; uses ZP_PTR_1 & ZP_PTR_2, temp for storing amount of bytes to copy
+
+    ; start at 2 bytes, the size of the word storing the number of levels
+    lda #02
+    sta temp
+    stz temp+1
+    
+    ; ZP_PTR_1 will point to the source data
+    lda #<LOADSTART
+    sta ZP_PTR_1
+    lda #>LOADSTART
+    sta ZP_PTR_1+1
+
+    ; load number of levels, pointed to by ZP_PTR_1,0
+    ldy #0
+    lda (ZP_PTR_1),y
+    sta no_levels
+
+    ; start at first level HEADER
+    lda #<LOADSTART+2
+    sta ZP_PTR_1
+    lda #>LOADSTART
+    sta ZP_PTR_1+1
+
+; iterate through each header and add the level's size to the temp variable
+@nextlevel:
+    ; go to width variable
+    ldy #2
+    ; store width variable to fieldwidth - this is a 8-bit variable, so no high byte needed
+    lda (ZP_PTR_1),y
+    sta fieldwidth
+    ; go to height variable
+    iny
+    iny
+    lda (ZP_PTR_1),y
+    tax ; loop counter
+
+@multiply:
+    ; add fieldwidth variable to temp at each interation - temp = temp + (width * height)
+    lda temp
+    clc
+    adc fieldwidth
+    sta temp
+    lda temp+1 ; don't forget the high byte
+    adc #0
+    sta temp+1
+    dex
+    bne @multiply
+
+    ; add HEADER size for this level to temp
+    lda temp
+    clc
+    adc #LEVELHEADER
+    sta temp
+    lda temp+1
+    adc #0
+    sta temp+1
+
+    ; next level?
+    dec no_levels
+    beq @copydata
+
+    ; next header
+    clc
+    lda ZP_PTR_1
+    adc #10
+    sta ZP_PTR_1
+    lda ZP_PTR_1+1
+    adc #0
+    sta ZP_PTR_1+1
+
+    bra @nextlevel
+@copydata:
+    ; copy (temp) amount of bytes from LOADSTART to Ram bank 0
+
+    ; set up source pointer
+    lda #<LOADSTART
+    sta ZP_PTR_1
+    lda #>LOADSTART
+    sta ZP_PTR_1+1
+
+    ; set up destination pointer
+    lda #<RAMBANK
+    sta ZP_PTR_2
+    lda #>RAMBANK
+    sta ZP_PTR_2+1
+
+    ldy #0
+@copybyte:
+    ; copy one byte of data
+    lda (ZP_PTR_1),y
+    sta (ZP_PTR_2),y
+
+    ; temp = temp -1
+    lda temp
+    sec
+    sbc #1
+    sta temp
+    lda temp+1
+    sbc #0
+    sta temp+1
+
+    ; if temp==0 done
+    lda temp+1
+    bne @copynextbyte
+    lda temp
+    bne @copynextbyte
+    bra @done
+@copynextbyte:
+    lda ZP_PTR_1
+    clc
+    adc #1
+    sta ZP_PTR_1
+    lda ZP_PTR_1+1
+    adc #0
+    sta ZP_PTR_1+1
+    lda ZP_PTR_2
+    clc
+    adc #1
+    sta ZP_PTR_2
+    lda ZP_PTR_2+1
+    adc #0
+    sta ZP_PTR_2+1
+    bra @copybyte
+@done:
+    rts
+
+
 initfield:
     ; load field pointer to first address at LOADSTART
     ; load 1st pointer to temp pointer ZP_PTR_1
@@ -924,17 +1055,6 @@ initfield:
     sta ZP_PTR_1+1
     bra @loop
 @fieldptrdone:
-    ldy #0  ; index to the offset from LOADSTART 
-    ; add LOADSTART address to the offset in this field
-    clc
-    lda (ZP_PTR_1),y
-    adc #<LOADSTART
-    sta ZP_PTR_FIELD
-    iny
-    lda (ZP_PTR_1),y
-    adc #>LOADSTART
-    sta ZP_PTR_FIELD+1
-    ; ZP_PTR_FIELD now contains the actual address in memory, not only the offset from the data
 
     ldy #2  ; index from payload pointer to width variable (low byte)
     lda (ZP_PTR_1),y 
@@ -945,17 +1065,108 @@ initfield:
     ldy #6  ; index from payload pointer to goals in this level (low byte)
     lda (ZP_PTR_1),y
     sta no_goals
-    ldy #8  ; index from payload pointer to player ptr in this level
+    ldy #8  ; index from payload pointer to player offset in this level. Offset is non-zero based!
 
-    clc
+    sec
     lda (ZP_PTR_1),y
-    adc #<LOADSTART
+    sbc #1
+    clc
+    adc #<RAMBANK
     sta ZP_PTR_3
     iny
     lda (ZP_PTR_1),y
-    adc #>LOADSTART
+    adc #>RAMBANK
     sta ZP_PTR_3+1
     ; ZP_PTR_3 now contains the actual address in memory of the player, not only the offset from the data
+
+    ; now copy the field data to the RAM bank
+    lda fieldheight
+    tax ; create counter
+    ; clear temp counter
+    stz temp
+    stz temp+1
+
+@multiply:
+    ; add fieldwidth variable to temp at each iteration - temp = temp + (width * height)
+    lda temp
+    clc
+    adc fieldwidth
+    sta temp
+    lda temp+1 ; don't forget the high byte
+    adc #0
+    sta temp+1
+    dex
+    bne @multiply
+
+    ; copy (temp) amount of bytes from current field pointer to Ram bank 0
+
+    ; currently ZP_PTR_1 is pointing to the selected field HEADER
+    ; retrieve the field pointer from it, and let ZP_PTR_FIELD to that
+    ldy #0
+    lda (ZP_PTR_1),y
+    sta ZP_PTR_FIELD
+    iny
+    lda (ZP_PTR_1),y
+    sta ZP_PTR_FIELD+1
+    ; now let this pointer start counting from LOADSTART, just as the offset in the input file references
+    lda ZP_PTR_FIELD
+    clc
+    adc #<LOADSTART
+    sta ZP_PTR_FIELD
+    lda ZP_PTR_FIELD+1
+    adc #>LOADSTART
+    sta ZP_PTR_FIELD+1
+
+    ; set up destination pointer
+    lda #<RAMBANK
+    sta ZP_PTR_2
+    lda #>RAMBANK
+    sta ZP_PTR_2+1
+
+    ldy #0
+@copybyte:
+    ; copy one byte of data
+    lda (ZP_PTR_FIELD),y
+    sta (ZP_PTR_2),y
+
+    ; temp = temp -1
+    lda temp
+    sec
+    sbc #1
+    sta temp
+    lda temp+1
+    sbc #0
+    sta temp+1
+
+    ; if temp==0 done
+    lda temp+1
+    bne @copynextbyte
+    lda temp
+    bne @copynextbyte
+    bra @done
+@copynextbyte:
+    lda ZP_PTR_FIELD
+    clc
+    adc #1
+    sta ZP_PTR_FIELD
+    lda ZP_PTR_FIELD+1
+    adc #0
+    sta ZP_PTR_FIELD+1
+    lda ZP_PTR_2
+    clc
+    adc #1
+    sta ZP_PTR_2
+    lda ZP_PTR_2+1
+    adc #0
+    sta ZP_PTR_2+1
+    bra @copybyte
+@done:
+    
+    ; prep the field pointer
+    lda #<RAMBANK
+    sta ZP_PTR_FIELD
+    lda #>RAMBANK
+    sta ZP_PTR_FIELD+1
     rts
 
 printfield:
