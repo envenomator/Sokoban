@@ -205,6 +205,7 @@ int main(int argc, char *argv[])
                 }
 
 //                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
+                leveloffset[n] = leveloffset[n] -1; // convert to zero-based offset from start of each level
                 fprintf(outptr,"%c%c",(char)fieldptr,(char)(fieldptr>>8));
                 fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
                 fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));

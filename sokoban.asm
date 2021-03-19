@@ -8,7 +8,7 @@ LEVELHEADER = 10
 MAXUNDO = 10
 SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
 SCREENHEIGHT = 30
-RAMBANK = $3000         ; Ram Bank 0
+RAMBANK = $a000         ; Ram Bank 0
 
 .org $080D
 .segment "STARTUP"
@@ -26,11 +26,11 @@ VERA_CTRL           = $9F25
    jmp start
 
 ; string constants
-message:          .byte "press a key",0
-selectmessage:    .byte "select a level (",0
+quitaskmessage:      .byte "really quit? y/n",0
+selectmessage:    .byte "select a level (1-",0
 selectendmessage: .byte "): ",0
 quitmessage:      .byte "press q to quit",0
-winstatement:     .byte "level complete!",0
+winstatement:     .byte "level complete! new level? y/n",0
 help0:            .byte "(c)2021 venom",0
 help1:            .byte "keyboard shortcuts:",0
 help2:            .byte "cursor - moves player",0
@@ -63,20 +63,17 @@ start:
     lda #UPPERCASE
     jsr CHROUT
 
-;    jsr levels_to_rambank   ; copy level data to the ram bank first
     jsr resetvars
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
     jsr cleartiles
 
     jsr displaytitlescreen
-
     jsr selectlevel
     jsr cleartiles      ; cls tiles
 
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
-;    jsr printfield
 
 keyloop:
     jsr GETIN
@@ -106,16 +103,25 @@ keyloop:
     jsr handle_undocommand
     bra @done
 @checkquit:
-    cmp #$51
+    cmp #$51 ; 'q'
     bne @done
+    jsr askquit
+    bcs @exit
+    jsr cls
+    jsr cleartiles
+    jsr printfield2
+    bra @done
+@exit:
+    jsr resetlayerconfig
     rts
 @done:
     ; check if we have reached all goals
     lda no_goals
     cmp no_goalsreached
     bne @donenextkey
-    jsr printwinstatement
-    rts
+    jsr asknewlevel
+    bcs @exit
+    jmp start   ; reset game / let user decide on new level
 @donenextkey:
     jmp keyloop
 
@@ -123,7 +129,6 @@ handle_undocommand:
     jsr pull_undostack
     ; x now contains previous move
     ;   as #%000MUDRL - Multiple move / Up / Down / Right / Left
-    ;
     ; we will give x to the handle_undo_**** routine, so it can see the combined bit (4) and act on it
 @checkup:
     txa
@@ -151,6 +156,48 @@ handle_undocommand:
     rts
 @emptystack:
     ; do nothing
+    rts
+
+asknewlevel:
+    ; ask if the user would like to play a new level, and return clear carry on 'y'
+    lda #<winstatement
+    sta ZP_PTR_1
+    lda #>winstatement
+    sta ZP_PTR_1+1
+    jsr displaymessagescreen
+
+@keyloop:
+    jsr GETIN
+@checkyes:
+    cmp #$59 ; Y
+    bne @checkno
+    clc
+    rts
+@checkno:
+    cmp #$4e ; N
+    bne @keyloop
+    sec
+    rts
+
+askquit:
+    ; ask if the user would like to quit, and return carry on 'y'
+    lda #<quitaskmessage
+    sta ZP_PTR_1
+    lda #>quitaskmessage
+    sta ZP_PTR_1+1
+    jsr displaymessagescreen
+
+@keyloop:
+    jsr GETIN
+@checkyes:
+    cmp #$59 ; Y
+    bne @checkno
+    sec
+    rts
+@checkno:
+    cmp #$4e ; N
+    bne @keyloop
+    clc
     rts
 
 handleright:
@@ -459,74 +506,6 @@ handle_undo_down:
     jsr printfield2
     rts
 
-
-handle_undomove_old:
-    ; input from pointers
-    ; 3 - player
-    ; 2 - backward destination of the player
-    ; 1 - block 'behind' the player, that will be put in the player's position after the undo
-
-
-    ; dummy undo up only
-    jsr moveplayeronfield
-    jsr moveplayerposition
-    jsr cls
-    jsr printfield2
-    rts
-
-    ; move the player 'back' first. Might return to a goal
-    ldy #$0
-    lda (ZP_PTR_1),y
-    cmp #'.'
-    beq @togoal
-    ; player will go to normal space
-    lda #'@'
-    sta (ZP_PTR_1),y
-    bra @next
-@togoal:
-    ; player will go to goal position
-    lda #'+'
-    sta (ZP_PTR_1),y
-@next:
-    ; move the crate back to the player's position. Player might have been standing on a goal
-    lda (ZP_PTR_3),y
-    cmp #'+'
-    beq @togoal2
-    ; crate will return as normal
-    lda #'$'
-    sta (ZP_PTR_1),y
-    bra @next2
-@togoal2:
-    ; crate will return to goal position
-    lda #'*'
-    sta (ZP_PTR_1),y
-@next2:
-    ; return empty space, check what was there in the first place
-    lda (ZP_PTR_2),y
-    cmp #'*'
-    beq @cratewasongoal
-    ; leave behind 'normal' goal
-    lda #'.'
-    sta (ZP_PTR_2),y
-    bra @next3
-@cratewasongoal:
-    ; leave behind empty space
-    lda #' '
-    sta (ZP_PTR_2),y
-@next3:
-
-    ; now return player pointer to new position
-    lda ZP_PTR_1
-    sta ZP_PTR_3
-    lda ZP_PTR_1+1
-    sta ZP_PTR_1+1
-
-    ; output the playing field
-    jsr printfield2
-    jsr cls
-
-    rts
-
 handlemove:
     ; pointers
     ; 3 - points to the player position
@@ -732,6 +711,7 @@ moveplayeronfield:
     rts
     
 print:
+    ; console routines only
     ; print from address ZP_PTR_1
     ; don't end with newline character
     phy
@@ -747,6 +727,7 @@ print:
     rts
 
 printline:
+    ; console routines only
     ; print from address ZP_PTR_1
     ; end with newline character
     jsr print
@@ -755,6 +736,7 @@ printline:
     rts
 
 printwinstatement:
+    ; console routines only
     lda #<winstatement
     sta ZP_PTR_1
     lda #>winstatement
@@ -764,6 +746,10 @@ printwinstatement:
 
 printdecimal:
     ; prints decimal from A register
+    ; VERA control needs to be set up previously
+    phx
+    phy
+    stx temp    ; keep color to print in
     ldy #$2f
     ldx #$3a
     sec
@@ -784,16 +770,27 @@ printdecimal:
     tya
     cmp #$30 ; is it a '0' petscii?
     beq @tens
-    jsr CHROUT ; print Y
+;    jsr CHROUT ; print Y
+    sta VERA_DATA0
+    lda temp
+    sta VERA_DATA0
 @tens:
     pla
     cmp #$30 ; is it a '0' petscii?
     beq @ones
-    jsr CHROUT ; print X
+;    jsr CHROUT ; print X
+    sta VERA_DATA0
+    lda temp
+    sta VERA_DATA0
 @ones:
     pla
-    jsr CHROUT ; print A
+;    jsr CHROUT ; print A
+    sta VERA_DATA0
+    lda temp
+    sta VERA_DATA0
 
+    ply
+    plx
     rts
 
 selectlevel:
@@ -801,33 +798,30 @@ selectlevel:
     sta currentlevel
 
 @mainloop:
-    jsr cls
-    jsr displayhelp
-
-    clc         ; PLOT to x,y
-    ldy #0      ; column 
-    ldx #45     ; row 
-    jsr PLOT
-
-    ; print selection message
+    ; text prep to VERA
+    stz VERA_CTRL
+    ldx #$9 ; color brown
+    lda #$10
+    sta VERA_HIGH
     lda #<selectmessage
     sta ZP_PTR_1
     lda #>selectmessage
     sta ZP_PTR_1+1
-    jsr print
+    lda #45
+    sta VERA_MID
+    lda #10*2
+    sta VERA_LOW
+    jsr printverastring
+
+
     ; print range
-    jsr CHROUT
-    lda #'1'
-    jsr CHROUT
-    lda #'-'
-    jsr CHROUT
     lda no_levels
     jsr printdecimal
     lda #<selectendmessage
     sta ZP_PTR_1
     lda #>selectendmessage
     sta ZP_PTR_1+1
-    jsr print
+    jsr printverastring
     ; print level number
     lda currentlevel
     jsr printdecimal
@@ -915,7 +909,9 @@ level_to_rambank:
     sta no_levels
 
     ; start at first level HEADER
-    lda #<LOADSTART+2
+    lda #<LOADSTART
+    clc
+    adc #2
     sta ZP_PTR_1
     lda #>LOADSTART
     sta ZP_PTR_1+1
@@ -1065,11 +1061,9 @@ initfield:
     ldy #6  ; index from payload pointer to goals in this level (low byte)
     lda (ZP_PTR_1),y
     sta no_goals
-    ldy #8  ; index from payload pointer to player offset in this level. Offset is non-zero based!
+    ldy #8  ; index from payload pointer to player offset in this level
 
-    sec
     lda (ZP_PTR_1),y
-    sbc #1
     clc
     adc #<RAMBANK
     sta ZP_PTR_3
@@ -1170,6 +1164,7 @@ initfield:
     rts
 
 printfield:
+    ; console routines only
     ; no clearscreen, just print the field to screen on current position
     ; depends only on
     ; - field label for start of field
@@ -1289,8 +1284,68 @@ loadtiles:
     rts
 
 displaytitlescreen:
+    lda #<titlescreen
+    sta ZP_PTR_1
+    lda #>titlescreen
+    sta ZP_PTR_1+1
+    jsr displaytileset
 
-; Fill the Layer 0 with the titlescreen tileset
+    jsr displayhelp
+
+    rts
+
+displaymessagescreen:
+    ; temp store pointer to the requested text
+    lda ZP_PTR_1
+    pha
+    lda ZP_PTR_1+1
+    pha
+
+    lda #<messagescreen
+    sta ZP_PTR_1
+    lda #>messagescreen
+    sta ZP_PTR_1+1
+    jsr displaytileset
+
+    ; now display the string at ZP_PTR_1 in the middle and return
+    pla
+    sta ZP_PTR_1+1
+    pla
+    sta ZP_PTR_1
+    stz VERA_CTRL
+    ;lda #%00100000
+    lda #$10
+    sta VERA_HIGH
+    lda #28
+    sta VERA_MID
+    lda #28*2
+    sta VERA_LOW
+    ldx #$9 ; color brown
+    jsr printverastring
+    rts
+
+printverastring:
+    ; ZP_PTR_1 is pointing to the string
+    ; x contains color of the text
+    ldy #0
+@loop:
+    lda (ZP_PTR_1),y
+    beq @end
+    cmp #$40    
+    bcc @output
+@AZ:
+    sec
+    sbc #$40
+@output:
+    sta VERA_DATA0
+    stx VERA_DATA0
+    iny
+    bra @loop
+@end:
+    rts
+
+displaytileset:
+; Fill the Layer 0 with the tileset pointed to by ZP_PTR_1
     stz VERA_CTRL                       ; Use Data Register 0
     lda #$10
     sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
@@ -1299,24 +1354,6 @@ displaytitlescreen:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-    ; address to the tileset
-    lda #<titlescreen
-    sta ZP_PTR_1
-    lda #>titlescreen
-    sta ZP_PTR_1+1
-
-;    ldy #0
-;@loop:
-;    lda (ZP_PTR_1),y
-;    clc
-;    adc #$1
-;    sta VERA_DATA0
-;    stz VERA_DATA0
-;    iny
-;    iny
-;    cpy #128
-;    bne @loop
-
     ldy #64
 @outerloop:
     ldx #64
@@ -1324,15 +1361,8 @@ displaytitlescreen:
     phy
     ldy #0
     lda (ZP_PTR_1),y                    ; load byte from tileset
-    bne @else    
-@brick:
-    lda #$1     ; brick tile
-    bra @next
-@else:
-    lda #$0     ; black tile
-@next:
     sta VERA_DATA0
-    stz VERA_DATA0
+    stz VERA_DATA0                      ; zero it's attribute
     ply
 
     ; increase pointer to next byte in the set
@@ -1352,48 +1382,61 @@ displaytitlescreen:
     rts
 
 displayhelp:
-    clc ; go to x,y
-    ldy #50
-    ldx #23
+    stz VERA_CTRL
+    ldx #$9 ; color brown
+    lda #$10
+    sta VERA_HIGH
 
-    jsr PLOT
     lda #<help0
     sta ZP_PTR_1
     lda #>help0
     sta ZP_PTR_1+1
-    jsr print
+    lda #23
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
 
-    ldx #30
-    jsr PLOT
     lda #<help1
     sta ZP_PTR_1
     lda #>help1
     sta ZP_PTR_1+1
-    jsr print
+    lda #30
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
 
-    ldx #32
-    jsr PLOT
     lda #<help2
     sta ZP_PTR_1
     lda #>help2
     sta ZP_PTR_1+1
-    jsr print
+    lda #32
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
 
-    ldx #33
-    jsr PLOT
     lda #<help3
     sta ZP_PTR_1
     lda #>help3
     sta ZP_PTR_1+1
-    jsr print
+    lda #33
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
 
-    ldx #34
-    jsr PLOT
     lda #<help4
     sta ZP_PTR_1
     lda #>help4
     sta ZP_PTR_1+1
-    jsr print
+    lda #34
+    sta VERA_MID
+    lda #50*2
+    sta VERA_LOW
+    jsr printverastring
+
     rts
 
 cleartiles:
@@ -1420,6 +1463,15 @@ cleartiles:
     dey
     bne :--
 
+    rts
+
+resetlayerconfig:
+; Change Layer 1 to 8 Color Mode
+    lda $9F34
+    and #%11110111                        ; Set bit 3 to 0, rest unchanged
+    sta $9F34
+
+    jsr cls
     rts
 
 layerconfig:
@@ -1649,6 +1701,8 @@ printfield2:
 
 printdecimal2:
     ; on entry A = value to print to standard out
+    phx
+    phy
     ldx #$ff
     sec
 @prdec100:
@@ -1667,16 +1721,21 @@ printdecimal2:
     jsr @prdecdigit
     tax
 @prdecdigit:
-    pha
+;    pha
     txa
     ora #'0'
-    jsr CHROUT
-    pla
+;    jsr CHROUT
+;    pla
+    ply
+    plx
+    sta VERA_DATA0
+    stx VERA_DATA0
     rts
 
 titlescreen:
 .incbin "tiles/titlescreen.bin"
-
+messagescreen:
+.incbin "tiles/messagescreen.bin"
 tiledata:
 black:
 .incbin "tiles/black.bin"
