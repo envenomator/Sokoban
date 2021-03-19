@@ -927,138 +927,6 @@ resetvars:
     stz undocounter
     rts
 
-level_to_rambank:
-    ; copy selected level data to Ram bank 0
-    ; uses ZP_PTR_1 & ZP_PTR_2, temp for storing amount of bytes to copy
-
-    ; start at 2 bytes, the size of the word storing the number of levels
-    lda #02
-    sta temp
-    stz temp+1
-    
-    ; ZP_PTR_1 will point to the source data
-    lda #<LOADSTART
-    sta ZP_PTR_1
-    lda #>LOADSTART
-    sta ZP_PTR_1+1
-
-    ; load number of levels, pointed to by ZP_PTR_1,0
-    ldy #0
-    lda (ZP_PTR_1),y
-    sta no_levels
-
-    ; start at first level HEADER
-    lda #<LOADSTART
-    clc
-    adc #2
-    sta ZP_PTR_1
-    lda #>LOADSTART
-    sta ZP_PTR_1+1
-
-; iterate through each header and add the level's size to the temp variable
-@nextlevel:
-    ; go to width variable
-    ldy #2
-    ; store width variable to fieldwidth - this is a 8-bit variable, so no high byte needed
-    lda (ZP_PTR_1),y
-    sta fieldwidth
-    ; go to height variable
-    iny
-    iny
-    lda (ZP_PTR_1),y
-    tax ; loop counter
-
-@multiply:
-    ; add fieldwidth variable to temp at each interation - temp = temp + (width * height)
-    lda temp
-    clc
-    adc fieldwidth
-    sta temp
-    lda temp+1 ; don't forget the high byte
-    adc #0
-    sta temp+1
-    dex
-    bne @multiply
-
-    ; add HEADER size for this level to temp
-    lda temp
-    clc
-    adc #LEVELHEADER
-    sta temp
-    lda temp+1
-    adc #0
-    sta temp+1
-
-    ; next level?
-    dec no_levels
-    beq @copydata
-
-    ; next header
-    clc
-    lda ZP_PTR_1
-    adc #LEVELHEADER
-    sta ZP_PTR_1
-    lda ZP_PTR_1+1
-    adc #0
-    sta ZP_PTR_1+1
-
-    bra @nextlevel
-@copydata:
-    ; copy (temp) amount of bytes from LOADSTART to Ram bank 0
-
-    ; set up source pointer
-    lda #<LOADSTART
-    sta ZP_PTR_1
-    lda #>LOADSTART
-    sta ZP_PTR_1+1
-
-    ; set up destination pointer
-    lda #<RAMBANK
-    sta ZP_PTR_2
-    lda #>RAMBANK
-    sta ZP_PTR_2+1
-
-    ldy #0
-@copybyte:
-    ; copy one byte of data
-    lda (ZP_PTR_1),y
-    sta (ZP_PTR_2),y
-
-    ; temp = temp -1
-    lda temp
-    sec
-    sbc #1
-    sta temp
-    lda temp+1
-    sbc #0
-    sta temp+1
-
-    ; if temp==0 done
-    lda temp+1
-    bne @copynextbyte
-    lda temp
-    bne @copynextbyte
-    bra @done
-@copynextbyte:
-    lda ZP_PTR_1
-    clc
-    adc #1
-    sta ZP_PTR_1
-    lda ZP_PTR_1+1
-    adc #0
-    sta ZP_PTR_1+1
-    lda ZP_PTR_2
-    clc
-    adc #1
-    sta ZP_PTR_2
-    lda ZP_PTR_2+1
-    adc #0
-    sta ZP_PTR_2+1
-    bra @copybyte
-@done:
-    rts
-
-
 initfield:
     ; load field pointer to first address at LOADSTART
     ; load 1st pointer to temp pointer ZP_PTR_1
@@ -1325,16 +1193,6 @@ loadtiles:
     
     rts
 
-displaytitlescreen:
-    lda #<titlescreen
-    sta ZP_PTR_1
-    lda #>titlescreen
-    sta ZP_PTR_1+1
-    jsr displaytileset
-
-    jsr displayhelp
-
-    rts
 
 displaymessagescreen:
     ; temp store pointer to the requested text
@@ -1395,7 +1253,7 @@ displaytileset:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-    ldy #30
+    ldy #32
 @outerloop:
     ldx #64
 @innerloop:
@@ -1422,7 +1280,13 @@ displaytileset:
 
     rts
 
-displayhelp:
+displaytitlescreen:
+    lda #<titlescreen
+    sta ZP_PTR_1
+    lda #>titlescreen
+    sta ZP_PTR_1+1
+    jsr displaytileset
+
     stz VERA_CTRL
     ldx #$9 ; color brown
     lda #$10
@@ -1499,11 +1363,7 @@ cleartiles:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-;    lda #0
-;    sta VERA_DATA0
-;    sta VERA_DATA0
-
-    ldy #64
+    ldy #32
     lda #0
 :   ldx #64
 :   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
@@ -1534,28 +1394,7 @@ layerconfig:
     lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
     sta $9F2F                           ; Store to Tile Base Pointer
 
-; Fill the Layer 0 with all zeros (black)
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    lda #$40
-    sta VERA_MID                        ; Set Middle Byte to $40
-    lda #$0
-    sta VERA_LOW                        ; Set Low Byte to $00
-
-;    lda #0
-;    sta VERA_DATA0
-;    sta VERA_DATA0
-
-    ldy #64
-    lda #0
-:   ldx #64
-:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    sta VERA_DATA0                      ; Write Attribute
-    dex
-    bne :-
-    dey
-    bne :--
+    jsr cleartiles
 
 ; Turn on Layer 0
     lda $9F29
@@ -1747,39 +1586,6 @@ printfield2:
 
     jmp @nextrow
 @nextsection:
-    rts
-
-printdecimal2:
-    ; on entry A = value to print to standard out
-    phx
-    phy
-    ldx #$ff
-    sec
-@prdec100:
-    inx
-    sbc #100
-    bcs @prdec100
-    adc #100
-    jsr @prdecdigit
-    ldx #$ff
-    sec
-@prdec10:
-    inx
-    sbc #10
-    bcs @prdec10
-    adc #10
-    jsr @prdecdigit
-    tax
-@prdecdigit:
-;    pha
-    txa
-    ora #'0'
-;    jsr CHROUT
-;    pla
-    ply
-    plx
-    sta VERA_DATA0
-    stx VERA_DATA0
     rts
 
 titlescreen:
