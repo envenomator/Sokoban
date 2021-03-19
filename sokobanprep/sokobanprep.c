@@ -191,11 +191,12 @@ int main(int argc, char *argv[])
             //                ## 2 byte load address
             //  x16 pointer ->## 2 byte number of levels in the file
             //
-            //                ## 2 byte start pointer to payload of level 0
+            //                ## 2 byte start pointer to payload of level 0 - starting from x16 pointer
             //                ## 2 byte width of level 0 (in characters)
             //                ## 2 byte height of level 0 (in lines)
             //                ## 2 byte number of goals in this level
-            //                ## 2 byte ptr to player character in level 0
+            //                ## 2 byte number of reached goals in this level (crates on a goal)
+            //                ## 2 byte offset to player character in level 0 - from each level's payload
             //                repeat of these 16-bit values for each additional level
             //                ## start payload 0
             // etc
@@ -214,7 +215,6 @@ int main(int argc, char *argv[])
 
 //                leveloffset[n] = fieldptr + leveloffset[n] - 1; // convert to memory address
                 leveloffset[n] = leveloffset[n] -1; // convert to zero-based offset from start of each level
-                levelgoalstaken[n] = levelgoals[n] - levelgoalstaken[n];
                 fprintf(outptr,"%c%c",(char)fieldptr,(char)(fieldptr>>8));
                 fprintf(outptr,"%c%c",(char)levelwidth[n],(char)(levelwidth[n]>>8));
                 fprintf(outptr,"%c%c",(char)levelheight[n],(char)(levelheight[n]>>8));

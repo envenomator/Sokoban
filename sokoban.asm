@@ -8,7 +8,7 @@ LEVELHEADER = 12
 MAXUNDO = 10
 SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
 SCREENHEIGHT = 30
-RAMBANK = $3000         ; Ram Bank 0
+RAMBANK = $a000         ; Ram Bank 0
 
 .org $080D
 .segment "STARTUP"
@@ -853,7 +853,6 @@ selectlevel:
     sta VERA_LOW
     jsr printverastring
 
-
     ; print range
     lda no_levels
     jsr printdecimal
@@ -1349,7 +1348,6 @@ displaymessagescreen:
     lda #>messagescreen
     sta ZP_PTR_1+1
     jsr displaytileset
-
     ; now display the string at ZP_PTR_1 in the middle and return
     pla
     sta ZP_PTR_1+1
@@ -1397,7 +1395,7 @@ displaytileset:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-    ldy #64
+    ldy #30
 @outerloop:
     ldx #64
 @innerloop:
@@ -1501,9 +1499,9 @@ cleartiles:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-    lda #0
-    sta VERA_DATA0
-    sta VERA_DATA0
+;    lda #0
+;    sta VERA_DATA0
+;    sta VERA_DATA0
 
     ldy #64
     lda #0
@@ -1545,9 +1543,9 @@ layerconfig:
     lda #$0
     sta VERA_LOW                        ; Set Low Byte to $00
 
-    lda #0
-    sta VERA_DATA0
-    sta VERA_DATA0
+;    lda #0
+;    sta VERA_DATA0
+;    sta VERA_DATA0
 
     ldy #64
     lda #0
@@ -1803,3 +1801,4 @@ crateongoal:
 .incbin "tiles/crateongoal.bin"
 LOADSTART:
 .incbin "levels.bin"
+
