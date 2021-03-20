@@ -76,6 +76,10 @@ start:
 
     jsr displaytitlescreen
     jsr selectlevel
+    bcc @continue
+    jsr resetlayerconfig
+    rts                 ; pressed 'q'
+@continue:
     jsr cleartiles      ; cls tiles
 
     jsr initfield       ; load correct startup values for selected field
@@ -955,11 +959,15 @@ selectlevel:
     bra @mainloop
 @checkreturnkey:
     cmp #$0d
-    bne @charloop
+    bne @checkquit
     ; return key pressed - select this level
     jsr cls
     rts
-
+@checkquit:
+    cmp #$51
+    bne @charloop
+    sec ; set carry to notify caller
+    rts
 resetvars:
     ; reset goals
     lda #0
