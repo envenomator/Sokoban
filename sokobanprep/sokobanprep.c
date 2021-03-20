@@ -188,18 +188,17 @@ int main(int argc, char *argv[])
             // calculate payload for level n
             // as the number of bytes AFTER the initial pointer to the number of levels in the file
             // FILE LAYOUT
-            //                ## 2 byte load address
-            //  x16 pointer ->## 2 byte number of levels in the file
-            //
-            //                ## 2 byte start pointer to payload of level 0 - starting from x16 pointer
+            //                ## 2 byte number of levels in the file
+            // 
+            //                Per-level header
+            //                ## 2 byte start pointer to payload of level 0 - starting from per-level header
             //                ## 2 byte width of level 0 (in characters)
             //                ## 2 byte height of level 0 (in lines)
             //                ## 2 byte number of goals in this level
             //                ## 2 byte number of reached goals in this level (crates on a goal)
             //                ## 2 byte offset to player character in level 0 - from each level's payload
             //                repeat of these 16-bit values for each additional level
-            //                ## start payload 0
-            // etc
+            //                ## start payload(s)
 
             // first determine if this is a valid level to output in the header
             if(validlevel[n] == true)
