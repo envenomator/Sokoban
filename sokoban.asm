@@ -29,6 +29,7 @@ VERA_CTRL           = $9F25
 quitaskmessage:      .byte "really quit? y/n",0
 selectmessage:    .byte "select a level (1-",0
 selectendmessage: .byte "): ",0
+clear:            .byte "                                        ",0
 resetmessage:     .byte "really reset level? y/n",0
 quitmessage:      .byte "press q to quit",0
 winstatement:     .byte "level complete! new level? y/n",0
@@ -902,6 +903,7 @@ selectlevel:
     sta currentlevel
 
 @mainloop:
+    jsr clearselect
     ; text prep to VERA
     stz VERA_CTRL
     ldx #$9 ; color brown
@@ -993,6 +995,23 @@ resetvars:
 
     stz undoindex
     stz undocounter
+    rts
+
+clearselect:
+    ; clear out select text first
+    stz VERA_CTRL
+    ldx #$9
+    lda #$10
+    sta VERA_HIGH
+    lda #<clear
+    sta ZP_PTR_1
+    lda #>clear
+    sta ZP_PTR_1+1
+    lda #45
+    sta VERA_MID
+    lda #10*2
+    sta VERA_LOW
+    jsr printverastring
     rts
 
 initfield:
