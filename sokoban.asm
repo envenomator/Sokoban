@@ -1,27 +1,13 @@
-.include "x16.inc"
-
 ; constants
 NEWLINE = $0D
 UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 12
 MAXUNDO = 10
-SCREENWIDTH = 40        ; screen width/height in 16x16 tiles
-SCREENHEIGHT = 30
-RAMBANK = $a000         ; Ram Bank 0
+SCREENWIDTH = 20        ; screen width/height in 16x16 tiles
+SCREENHEIGHT = 15
 
-.org $080D
-.segment "STARTUP"
-.segment "INIT"
-.segment "ONCE"
 .segment "CODE"
-
-; VERA Registers
-VERA_LOW            = $9F20
-VERA_MID            = $9F21
-VERA_HIGH           = $9F22
-VERA_DATA0          = $9F23
-VERA_CTRL           = $9F25
 
    jmp start
 
@@ -33,7 +19,7 @@ clear:            .byte "                                        ",0
 resetmessage:     .byte "really reset level? y/n",0
 quitmessage:      .byte "press q to quit",0
 winstatement:     .byte "level complete! new level? y/n",0
-help0:            .byte "(c)2021 venom",0
+help0:            .byte "(c)2022 venom",0
 help1:            .byte "keyboard shortcuts:",0
 help2:            .byte "cursor - moves player",0
 help3:            .byte "     q - quit",0
@@ -50,27 +36,30 @@ no_goals:       .byte 0 ; will be read by initfield, depending on the currentlev
 no_goalsreached:.byte 0 ; static now, reset for each game
 fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
 fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
-vera_byte_low:  .byte 0
-vera_byte_mid:  .byte 0
 undostack:      .byte 0,0,0,0,0,0,0,0,0,0
 undoindex:      .byte 0
 undocounter:    .byte 0
 
 ; usage of zeropage address space:
-; ZP_PTR_1 - temporary pointer
-; ZP_PTR_2 - temporary pointer
-; ZP_PTR_3 - position of player
-ZP_PTR_FIELD = $28
-temp = $30  ; used for temp 8/16 bit storage $30/$31
-ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
+ZP_PTR_1      = $1 ; temporary pointer
+ZP_PTR_2      = $3 ; temporary pointer
+ZP_PTR_3      = $5 ; position of player
+ZP_PTR_FIELD  = $7
+temp          = $9  ; used for temp 8/16 bit storage $9/$A
+ZP_PTR_UNDO   = $B ; used to point to the 'undo stack'
+
+GETIN:
+    lda #$0200  ; mail flag
+    cmp #$01    ; character received?
+    bne GETIN   ; blocked wait for character
+    stz #$0200  ; acknowledge receive
+    lda #$0201  ; receive the character from the mailbox slot
+    rts
 
 start:
-    ; force uppercase
-    lda #UPPERCASE
-    jsr CHROUT
-
-    jsr loadtiles       ; load tiles from normal memory to VRAM
-    jsr layerconfig     ; configure layer 0/1 on screen
+    ; Init stack
+    ldx #$ff  ; start stack at $1ff
+    txs       ; init stack pointer (X => SP)
 
     jsr resetvars
     jsr cleartiles
@@ -78,7 +67,6 @@ start:
     jsr displaytitlescreen
     jsr selectlevel
     bcc @continue
-    jsr resetlayerconfig
     rts                 ; pressed 'q'
 @continue:
     jsr cleartiles      ; cls tiles
@@ -139,7 +127,6 @@ keyloop:
     jsr printfield2
     bra @done
 @exit:
-    jsr resetlayerconfig
     rts
 @done:
     ; check if we have reached all goals
@@ -151,7 +138,6 @@ keyloop:
     beq @gotomenu   ; reset game / let user decide on new level
     cmp #$51 ; Quit
     bne @nextgame
-    jsr resetlayerconfig
     rts
 @gotomenu:
     jmp start
@@ -1233,54 +1219,6 @@ cls:
     jsr CHROUT
     rts
 
-loadtiles:
-; Build  16x16 256 color tiles in VRAM location $12000
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$11
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 1
-    lda #$20
-    sta VERA_MID                        ; Set Middle Byte to $20
-    stz VERA_LOW                        ; Set Low Byte to $00
-
-    ldx #0
-:   lda tiledata,x                      ; index 0 / black tile
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    ; load Brick data
-    ldx #0
-:   lda Brick,x                         ; index 1 / brick
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    ; load player data
-    ldx #0
-:   lda player,x                        ; index 2 / player
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    ; load crate data
-    ldx #0
-:   lda crate,x                         ; index 3 / crate (normal)
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    ; load goal data
-    ldx #0
-:   lda goal,x                         ; index 4 / goal (normal)
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    ; load crateongoal data
-    ldx #0
-:   lda crateongoal,x                   ; index 5 / crate on goal
-    sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    inx
-    bne :-
-    
-    rts
-
-
 displaymessagescreen:
     ; temp store pointer to the requested text
     lda ZP_PTR_1
@@ -1441,82 +1379,33 @@ displaytitlescreen:
     rts
 
 cleartiles:
-; Fill the Layer 0 with all zeros (black)
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    lda #$40
-    sta VERA_MID                        ; Set Middle Byte to $40
+    ; Fill the entire screen with empty tile (space)
     lda #$0
-    sta VERA_LOW                        ; Set Low Byte to $00
+    sta temp            ; low byte to temp
+    lda #$f8
+    sta temp+1          ; high byte to temp
 
-    ldy #32
-    lda #0
-:   ldx #64
-:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    sta VERA_DATA0                      ; Write Attribute
-    dex
-    bne :-
-    dey
-    bne :--
-
-    rts
-
-resetlayerconfig:
-; Change Layer 1 to 8 Color Mode
-    lda $9F34
-    and #%11110111                        ; Set bit 3 to 0, rest unchanged
-    sta $9F34
-
-    jsr cls
-    rts
-
-layerconfig:
-; Configure Layer 0
-    lda #%01010011                      ; 64 x 64 tiles, 8 bits per pixel
-    sta $9F2D
-    lda #$20                            ; $20 points to $4000 in VRAM
-    sta $9F2E                           ; Store to Map Base Pointer
-
-    lda #$93                            ; $48 points to $12000, Width and Height 16 pixel
-    sta $9F2F                           ; Store to Tile Base Pointer
-
-    jsr cleartiles
-
-; Turn on Layer 0
-    lda $9F29
-    ora #%00110000                      ; Bits 4 and 5 are set to 1
-    sta $9F29                           ; So both Later 0 and 1 are turned on
-
-; Change Layer 1 to 256 Color Mode
-    lda $9F34
-    ora #%001000                        ; Set bit 3 to 1, rest unchanged
-    sta $9F34
-
-; Clear Layer 1
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    stz VERA_MID                        ; Set Middle Byte to $00
-    stz VERA_LOW                        ; Set Low Byte to $00
-
-    lda #30
-    sta $02                             ; save counter for rows
-    ldy #$01                            ; Color Attribute white on black background
-    lda #$20                            ; Blank character
-    ldx #0
-:   sta VERA_DATA0                      ; Write to VRAM with +1 Autoincrement
-    sty VERA_DATA0                      ; Write Attribute
+    ldx #$0
+@outer:
+    lda #$32            ; space character
+    ldy #$0
+@inner:
+    sta (temp),y
+    iny
+    cpy #40
+    bne @inner          ; next column
+    clc
+    lda temp
+    adc #40             ; next row
+    sta temp
+    bcc @nexttemp
+    lda temp+1
+    adc #$0             ; add the carry (1) to the high byte
+    sta temp+1
+@nexttemp:
     inx
-    bne :-
-    dec $02
-    bne :-
-
-; Scale Display x2 for resolution of 320 x 240 pixels
-;    lda #$40
-;    sta $9F2A
-;    sta $9F2B
-
+    cpx #30
+    bne @outer
     rts
 
 printfield2:
@@ -1696,4 +1585,4 @@ crateongoal:
 .incbin "tiles/crateongoal.bin"
 LOADSTART:
 .incbin "levels.bin"
-
+RAMBANK:    // Start of variable DATA, used for copying new field into
