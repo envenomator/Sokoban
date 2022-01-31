@@ -7,8 +7,8 @@
 #define LOADADDRESSIZE 2
 #define HEADERSIZE 12
 #define BUFFERSIZE 128
-#define MAXWIDTH 40
-#define MAXHEIGHT 30
+#define MAXWIDTH 20
+#define MAXHEIGHT 15
 
 char linebuffer[BUFFERSIZE];
 
