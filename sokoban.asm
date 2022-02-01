@@ -9,14 +9,15 @@ HEIGHT_IN_TILES = 15
 SCREENWIDTH     = 40       ; actual screenwidth
 SCREENHEIGHT    = 30       ; actual screenheight
 
-KEY_UP          = 0x0B
-KEY_DOWN        = 0x0A
-KEY_LEFT        = 0x08
-KEY_RIGHT       = 0x15
-KEY_ENTER       = 0x0D
-KEY_Q           = 0x51
-KEY_UP          = 0x55
-KEY_R           = 0x52
+KEY_UP          = $0B
+KEY_DOWN        = $0A
+KEY_LEFT        = $08
+KEY_RIGHT       = $15
+KEY_ENTER       = $0D
+KEY_Q           = $51
+KEY_UP          = $55
+KEY_R           = $52
+KEY_M           = $4D
 
 .segment "CODE"
 
@@ -112,7 +113,7 @@ keyloop:
 @checkreset:
     cmp #KEY_R
     beq @handle_reset
-    cmp #(KEY_R | 0x20) ; lower case
+    cmp #(KEY_R | $20) ; lower case
     bne @checkquit
 @handle_reset:
     jsr askreset
@@ -129,7 +130,7 @@ keyloop:
 @checkquit:
     cmp #KEY_Q
     beq @handle_quit
-    cmp #(KEY_Q | 0x20) ; lower case
+    cmp #(KEY_Q | $20) ; lower case
     bne @done
 @handle_quit:
     jsr askquit
@@ -145,10 +146,16 @@ keyloop:
     cmp no_goalsreached
     bne @donenextkey
     jsr asknewlevel
-    cmp #$4d ; Menu
+    cmp #KEY_M ; Menu
     beq @gotomenu   ; reset game / let user decide on new level
-    cmp #$51 ; Quit
-    bne @nextgame
+    cmp #(KEY_M | $20) ; Menu
+    beq @gotomenu
+    cmp #KEY_Q ; Quit
+    beq @quit
+    cmp #(KEY_Q | $20) ; Quit
+    beq @quit
+    bra @nextgame
+@quit:
     rts
 @gotomenu:
     jmp start
@@ -253,17 +260,21 @@ asknewlevel:
 
 @keyloop:
     jsr GETIN
-@checkmenu:
-    cmp #$4D ; M (enu)
-    bne @checknext
-    rts
-@checknext:
+    ; these lines will filter for 'M / m / N / n / Q / q'
+    cmp #KEY_M ; M (enu)
+    beq @done
+    cmp #(KEY_M | $20); lower case
+    beq @done
     cmp #$4E ; N (ext)
-    bne @checkquit
-    rts
-@checkquit:
-    cmp #$51 ; Q (uit)
-    bne @keyloop
+    beq @done
+    cmp #($KEY_N | $20) ; lower case
+    beq @done
+    cmp #KEY_Q ; Q (uit)
+    beq @done
+    cmp @(KEY_Q | $20) ; lower case
+    beq @done
+    bra @keyloop
+@done:
     rts
 
 askquit:
