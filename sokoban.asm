@@ -4,8 +4,10 @@ UPPERCASE = $8E
 CLEARSCREEN = 147
 LEVELHEADER = 12
 MAXUNDO = 10
-SCREENWIDTH = 20        ; screen width/height in 16x16 tiles
-SCREENHEIGHT = 15
+WIDTH_IN_TILES = 20        ; screen width/height in 16x16 tiles
+HEIGHT_IN_TILES = 15
+SCREENWIDTH     = 40       ; actual screenwidth
+SCREENHEIGHT    = 30       ; actual screenheight
 
 .segment "CODE"
 
@@ -49,11 +51,11 @@ temp          = $9  ; used for temp 8/16 bit storage $9/$A
 ZP_PTR_UNDO   = $B ; used to point to the 'undo stack'
 
 GETIN:
-    lda #$0200  ; mail flag
+    lda $0200  ; mail flag
     cmp #$01    ; character received?
     bne GETIN   ; blocked wait for character
-    stz #$0200  ; acknowledge receive
-    lda #$0201  ; receive the character from the mailbox slot
+    stz $0200  ; acknowledge receive
+    lda $0201  ; receive the character from the mailbox slot
     rts
 
 start:
@@ -1392,11 +1394,11 @@ cleartiles:
 @inner:
     sta (temp),y
     iny
-    cpy #40
+    cpy #SCREENWIDTH
     bne @inner          ; next column
     clc
     lda temp
-    adc #40             ; next row
+    adc #SCREENWIDTH             ; next row
     sta temp
     bcc @nexttemp
     lda temp+1
@@ -1404,7 +1406,7 @@ cleartiles:
     sta temp+1
 @nexttemp:
     inx
-    cpx #30
+    cpx #SCREENHEIGHT
     bne @outer
     rts
 
@@ -1415,16 +1417,16 @@ printfield2:
     sta vera_byte_mid
     stz vera_byte_low
 
-; shift to the right (SCREENWIDTH - fieldwidth) /2 positions *2 to compensate for attribute
-    lda #SCREENWIDTH
+; shift to the right (WIDTH_IN_TILES - fieldwidth) /2 positions *2 to compensate for attribute
+    lda #WIDTH_IN_TILES
     sec
     sbc fieldwidth
     lsr ; /2
     asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP 
     sta vera_byte_low
 
-; shift down number of rows (SCREENHEIGHT - fieldheight) /2 positions
-    lda #SCREENHEIGHT
+; shift down number of rows (HEIGHT_IN_TILES - fieldheight) /2 positions
+    lda #HEIGHT_IN_TILES
     sec
     sbc fieldheight
     lsr ; /2
