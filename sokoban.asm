@@ -9,6 +9,15 @@ HEIGHT_IN_TILES = 15
 SCREENWIDTH     = 40       ; actual screenwidth
 SCREENHEIGHT    = 30       ; actual screenheight
 
+KEY_UP          = 0x0B
+KEY_DOWN        = 0x0A
+KEY_LEFT        = 0x08
+KEY_RIGHT       = 0x15
+KEY_ENTER       = 0x0D
+KEY_Q           = 0x51
+KEY_UP          = 0x55
+KEY_R           = 0x52
+
 .segment "CODE"
 
    jmp start
@@ -50,14 +59,6 @@ ZP_PTR_FIELD  = $7
 temp          = $9  ; used for temp 8/16 bit storage $9/$A
 ZP_PTR_UNDO   = $B ; used to point to the 'undo stack'
 
-GETIN:
-    lda $0200  ; mail flag
-    cmp #$01    ; character received?
-    bne GETIN   ; blocked wait for character
-    stz $0200  ; acknowledge receive
-    lda $0201  ; receive the character from the mailbox slot
-    rts
-
 start:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
@@ -66,46 +67,54 @@ start:
     jsr resetvars
     jsr cleartiles
 
-    jsr displaytitlescreen
-    jsr selectlevel
-    bcc @continue
-    rts                 ; pressed 'q'
+    lda #$1
+    sta currentlevel    ; start with level 1
+
+    ;jsr displaytitlescreen
+    ;jsr selectlevel
+    ;bcc @continue
+    ;rts                 ; pressed 'q'
 @continue:
     jsr cleartiles      ; cls tiles
-
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
 
 keyloop:
     jsr GETIN
 @checkdown:
-    cmp #$11
+    cmp #KEY_DOWN
     bne @checkup
     jsr handledown
     bra @done
 @checkup:
-    cmp #$91
+    cmp #KEY_UP
     bne @checkleft
     jsr handleup
     bra @done
 @checkleft:
-    cmp #$9d
+    cmp #KEY_LEFT
     bne @checkright
     jsr handleleft
     bra @done
 @checkright:
-    cmp #$1d
+    cmp #KEY_RIGHT
     bne @checkundo
     jsr handleright
     bra @done
 @checkundo:
-    cmp #$55 ; 'u'
+    cmp #KEY_U
+    beq @handle_undo
+    cmp #(KEY_U | $20) ; lower case
     bne @checkreset
+@handle_undo:
     jsr handle_undocommand
     bra @done
 @checkreset:
-    cmp #$52 ; 'r'
+    cmp #KEY_R
+    beq @handle_reset
+    cmp #(KEY_R | 0x20) ; lower case
     bne @checkquit
+@handle_reset:
     jsr askreset
     bcs @resetgame
     jsr cleartiles
@@ -118,8 +127,11 @@ keyloop:
     jsr printfield2
     bra keyloop
 @checkquit:
-    cmp #$51 ; 'q'
+    cmp #KEY_Q
+    beq @handle_quit
+    cmp #(KEY_Q | 0x20) ; lower case
     bne @done
+@handle_quit:
     jsr askquit
     bcs @exit
     jsr cleartiles
@@ -154,6 +166,14 @@ keyloop:
 
 @donenextkey:
     jmp keyloop
+
+GETIN:
+    lda $0200  ; mail flag
+    cmp #$01    ; character received?
+    bne GETIN   ; blocked wait for character
+    stz $0200  ; acknowledge receive
+    lda $0201  ; receive the character from the mailbox slot
+    rts
 
 handle_undocommand:
     jsr pull_undostack
