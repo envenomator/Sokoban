@@ -108,12 +108,10 @@ keyloop:
     bne @checkquit
     jsr askreset
     bcs @resetgame
-    jsr cls
     jsr cleartiles
     jsr printfield2
     bra @done
 @resetgame:
-    jsr cls
     jsr cleartiles
     jsr resetvars
     jsr initfield
@@ -124,7 +122,6 @@ keyloop:
     bne @done
     jsr askquit
     bcs @exit
-    jsr cls
     jsr cleartiles
     jsr printfield2
     bra @done
@@ -149,7 +146,6 @@ keyloop:
     cmp currentlevel
     beq @gotomenu   ; select another game
     inc currentlevel ; next level
-    jsr cls
     jsr resetvars
     jsr cleartiles
 
@@ -194,7 +190,6 @@ handle_undocommand:
 
 asknewlevel:
     ; display level complete tilesetj
-    jsr cls
     lda #<completescreen
     sta ZP_PTR_1
     lda #>completescreen
@@ -362,7 +357,6 @@ handle_undo_right:
     
     jsr movecrateonfield
 @done:
-    jsr cls
     jsr printfield2
     rts
 
@@ -437,7 +431,6 @@ handle_undo_left:
     
     jsr movecrateonfield
 @done:
-    jsr cls
     jsr printfield2
     rts
 
@@ -516,7 +509,6 @@ handle_undo_up:
     
     jsr movecrateonfield
 @done:
-    jsr cls
     jsr printfield2
     rts
 
@@ -595,7 +587,6 @@ handle_undo_down:
     
     jsr movecrateonfield
 @done:
-    jsr cls
     jsr printfield2
     rts
 
@@ -650,7 +641,6 @@ handlemove:
 
 @movecomplete:
     jsr printfield2
-    jsr cls
     rts
 
 @ignore: ; nothing to move
@@ -951,7 +941,6 @@ selectlevel:
     cmp #$0d
     bne @checkquit
     ; return key pressed - select this level
-    jsr cls
     rts
 @checkquit:
     cmp #$51
@@ -1214,11 +1203,6 @@ printfield:
     sta ZP_PTR_1+1
     jsr printline
 
-    rts
-
-cls:
-    lda #CLEARSCREEN
-    jsr CHROUT
     rts
 
 displaymessagescreen:
