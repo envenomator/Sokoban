@@ -8,6 +8,7 @@ WIDTH_IN_TILES = 20        ; screen width/height in 16x16 tiles
 HEIGHT_IN_TILES = 15
 SCREENWIDTH     = 40       ; actual screenwidth
 SCREENHEIGHT    = 30       ; actual screenheight
+VIDEOSTART      = $F800    ; top-left memory address in Cerberus 2080
 
 KEY_UP          = $0B
 KEY_DOWN        = $0A
@@ -15,10 +16,20 @@ KEY_LEFT        = $08
 KEY_RIGHT       = $15
 KEY_ENTER       = $0D
 KEY_Q           = $51
-KEY_UP          = $55
 KEY_R           = $52
 KEY_M           = $4D
+KEY_N           = $4E
+KEY_U           = $55
 
+; 16x16 Tile indexes, will later be translated to 8x8 video characters with codes 0-255
+TILE_PLAYER         = $0
+TILE_CRATE          = $1
+TILE_GOAL           = $2
+TILE_CRATE_ON_GOAL  = $3
+TILE_WALL           = $4
+TILE_IGNORE         = $5
+
+.setcpu "65C02"
 .segment "CODE"
 
    jmp start
@@ -57,8 +68,10 @@ ZP_PTR_1      = $1 ; temporary pointer
 ZP_PTR_2      = $3 ; temporary pointer
 ZP_PTR_3      = $5 ; position of player
 ZP_PTR_FIELD  = $7
-temp          = $9  ; used for temp 8/16 bit storage $9/$A
-ZP_PTR_UNDO   = $B ; used to point to the 'undo stack'
+temp          = $9  ; used for temp 8/16 bit storage $9/$A, or just local temp variables
+temp2         = $B
+ZP_PTR_UNDO   = $D ; used to point to the 'undo stack'
+video         = $F ; used to point to the actual video address
 
 start:
     ; Init stack
@@ -155,8 +168,6 @@ keyloop:
     cmp #(KEY_Q | $20) ; Quit
     beq @quit
     bra @nextgame
-@quit:
-    rts
 @gotomenu:
     jmp start
 @nextgame:
@@ -170,9 +181,10 @@ keyloop:
 
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
-
 @donenextkey:
     jmp keyloop
+@quit:
+    rts
 
 GETIN:
     lda $0200  ; mail flag
@@ -217,46 +229,46 @@ handle_undocommand:
 
 asknewlevel:
     ; display level complete tilesetj
-    lda #<completescreen
-    sta ZP_PTR_1
-    lda #>completescreen
-    sta ZP_PTR_1+1
-    jsr displaytileset
-
-    stz VERA_CTRL
-    ldx #$9 ; color brown
-    lda #$10
-    sta VERA_HIGH
-
-    lda #<done0
-    sta ZP_PTR_1
-    lda #>done0
-    sta ZP_PTR_1+1
-    lda #37
-    sta VERA_MID
-    lda #38*2
-    sta VERA_LOW
-    jsr printverastring
-
-    lda #<done1
-    sta ZP_PTR_1
-    lda #>done1
-    sta ZP_PTR_1+1
-    lda #41
-    sta VERA_MID
-    lda #38*2
-    sta VERA_LOW
-    jsr printverastring
-
-    lda #<done2
-    sta ZP_PTR_1
-    lda #>done2
-    sta ZP_PTR_1+1
-    lda #45
-    sta VERA_MID
-    lda #38*2
-    sta VERA_LOW
-    jsr printverastring
+;    lda #<completescreen
+;    sta ZP_PTR_1
+;    lda #>completescreen
+;    sta ZP_PTR_1+1
+;    jsr displaytileset
+;
+;    stz VERA_CTRL
+;    ldx #$9 ; color brown
+;    lda #$10
+;    sta VERA_HIGH
+;
+;    lda #<done0
+;    sta ZP_PTR_1
+;    lda #>done0
+;    sta ZP_PTR_1+1
+;    lda #37
+;    sta VERA_MID
+;    lda #38*2
+;    sta VERA_LOW
+;    jsr printverastring
+;
+;    lda #<done1
+;    sta ZP_PTR_1
+;    lda #>done1
+;    sta ZP_PTR_1+1
+;    lda #41
+;    sta VERA_MID
+;    lda #38*2
+;    sta VERA_LOW
+;    jsr printverastring
+;
+;    lda #<done2
+;    sta ZP_PTR_1
+;    lda #>done2
+;    sta ZP_PTR_1+1
+;    lda #45
+;    sta VERA_MID
+;    lda #38*2
+;    sta VERA_LOW
+;    jsr printverastring
 
 @keyloop:
     jsr GETIN
@@ -267,11 +279,11 @@ asknewlevel:
     beq @done
     cmp #$4E ; N (ext)
     beq @done
-    cmp #($KEY_N | $20) ; lower case
+    cmp #(KEY_N | $20) ; lower case
     beq @done
     cmp #KEY_Q ; Q (uit)
     beq @done
-    cmp @(KEY_Q | $20) ; lower case
+    cmp #(KEY_Q | $20) ; lower case
     beq @done
     bra @keyloop
 @done:
@@ -824,40 +836,6 @@ moveplayeronfield:
 @done:
     rts
     
-print:
-    ; console routines only
-    ; print from address ZP_PTR_1
-    ; don't end with newline character
-    phy
-    ldy #0
-@loop:
-    lda (ZP_PTR_1),y ; load character from address
-    beq @done        ; end at 0 character
-    jsr CHROUT 
-    iny
-    bra @loop
-@done:
-    ply
-    rts
-
-printline:
-    ; console routines only
-    ; print from address ZP_PTR_1
-    ; end with newline character
-    jsr print
-    lda #NEWLINE
-    jsr CHROUT
-    rts
-
-printwinstatement:
-    ; console routines only
-    lda #<winstatement
-    sta ZP_PTR_1
-    lda #>winstatement
-    sta ZP_PTR_1+1
-    jsr printline
-    rts
-
 printdecimal:
     ; prints decimal from A register
     ; VERA control needs to be set up previously
@@ -884,24 +862,21 @@ printdecimal:
     tya
     cmp #$30 ; is it a '0' petscii?
     beq @tens
-;    jsr CHROUT ; print Y
-    sta VERA_DATA0
-    lda temp
-    sta VERA_DATA0
+;    sta VERA_DATA0
+;    lda temp
+;    sta VERA_DATA0
 @tens:
     pla
     cmp #$30 ; is it a '0' petscii?
     beq @ones
-;    jsr CHROUT ; print X
-    sta VERA_DATA0
-    lda temp
-    sta VERA_DATA0
+;    sta VERA_DATA0
+;    lda temp
+;    sta VERA_DATA0
 @ones:
     pla
-;    jsr CHROUT ; print A
-    sta VERA_DATA0
-    lda temp
-    sta VERA_DATA0
+;    sta VERA_DATA0
+;    lda temp
+;    sta VERA_DATA0
 
     ply
     plx
@@ -914,19 +889,19 @@ selectlevel:
 @mainloop:
     jsr clearselect
     ; text prep to VERA
-    stz VERA_CTRL
-    ldx #$9 ; color brown
-    lda #$10
-    sta VERA_HIGH
-    lda #<selectmessage
-    sta ZP_PTR_1
-    lda #>selectmessage
-    sta ZP_PTR_1+1
-    lda #45
-    sta VERA_MID
-    lda #10*2
-    sta VERA_LOW
-    jsr printverastring
+;    stz VERA_CTRL
+;    ldx #$9 ; color brown
+;    lda #$10
+;    sta VERA_HIGH
+;    lda #<selectmessage
+;    sta ZP_PTR_1
+;    lda #>selectmessage
+;    sta ZP_PTR_1+1
+;    lda #45
+;    sta VERA_MID
+;    lda #10*2
+;    sta VERA_LOW
+;    jsr printverastring
 
     ; print range
     lda no_levels
@@ -1007,18 +982,18 @@ resetvars:
 
 clearselect:
     ; clear out select text first
-    stz VERA_CTRL
+;    stz VERA_CTRL
     ldx #$9
     lda #$10
-    sta VERA_HIGH
+;    sta VERA_HIGH
     lda #<clear
     sta ZP_PTR_1
     lda #>clear
     sta ZP_PTR_1+1
     lda #45
-    sta VERA_MID
+;    sta VERA_MID
     lda #10*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
     rts
 
@@ -1168,74 +1143,6 @@ initfield:
     sta ZP_PTR_FIELD+1
     rts
 
-printfield:
-    ; console routines only
-    ; no clearscreen, just print the field to screen on current position
-    ; depends only on
-    ; - field label for start of field
-
-    lda ZP_PTR_FIELD
-    sta ZP_PTR_1
-    lda ZP_PTR_FIELD+1
-    sta ZP_PTR_1+1
-    ldx #0 ; row counter
-@nextrow:
-    ldy #0 ; column counter
-@row:
-    lda (ZP_PTR_1),y
-    cmp #'@'
-    beq @character
-    cmp #'+'
-    beq @character
-    bra @normalcolor
-@character:
-    pha
-    lda #$9e ; YELLOW
-    jsr CHROUT
-    pla
-    jsr CHROUT
-    lda #$05 ; WHITE
-    jsr CHROUT
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
-@normalcolor:
-    jsr CHROUT
-    iny
-    cpy fieldwidth
-    bne @row
-@endline:
-    lda #NEWLINE
-    jsr CHROUT
-    
-    ; advance pointer to next row
-    lda ZP_PTR_1
-    clc
-    adc fieldwidth
-    sta ZP_PTR_1
-    bcc @checklastrow ; no carry, don't increment high byte on pointer
-    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-    clc
-    adc #1
-    sta ZP_PTR_1+1
-@checklastrow:
-    ; last row?
-    inx
-    cpx fieldheight
-    bne @nextrow
-
-    ; print quit message at the end of the field
-    lda #NEWLINE
-    jsr CHROUT
-    lda #<quitmessage
-    sta ZP_PTR_1
-    lda #>quitmessage
-    sta ZP_PTR_1+1
-    jsr printline
-
-    rts
-
 displaymessagescreen:
     ; temp store pointer to the requested text
     lda ZP_PTR_1
@@ -1253,14 +1160,14 @@ displaymessagescreen:
     sta ZP_PTR_1+1
     pla
     sta ZP_PTR_1
-    stz VERA_CTRL
+;    stz VERA_CTRL
     ;lda #%00100000
     lda #$10
-    sta VERA_HIGH
+;    sta VERA_HIGH
     lda #28
-    sta VERA_MID
+;    sta VERA_MID
     lda #28*2
-    sta VERA_LOW
+;    sta VERA_LOW
     ldx #$9 ; color brown
     jsr printverastring
     rts
@@ -1278,8 +1185,8 @@ printverastring:
     sec
     sbc #$40
 @output:
-    sta VERA_DATA0
-    stx VERA_DATA0
+;    sta VERA_DATA0
+;    stx VERA_DATA0
     iny
     bra @loop
 @end:
@@ -1287,13 +1194,13 @@ printverastring:
 
 displaytileset:
 ; Fill the Layer 0 with the tileset pointed to by ZP_PTR_1
-    stz VERA_CTRL                       ; Use Data Register 0
+;    stz VERA_CTRL                       ; Use Data Register 0
     lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
+;    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
     lda #$40
-    sta VERA_MID                        ; Set Middle Byte to $40
+;    sta VERA_MID                        ; Set Middle Byte to $40
     lda #$0
-    sta VERA_LOW                        ; Set Low Byte to $00
+;    sta VERA_LOW                        ; Set Low Byte to $00
 
     ldy #32
 @outerloop:
@@ -1302,8 +1209,8 @@ displaytileset:
     phy
     ldy #0
     lda (ZP_PTR_1),y                    ; load byte from tileset
-    sta VERA_DATA0
-    stz VERA_DATA0                      ; zero it's attribute
+;    sta VERA_DATA0
+;    stz VERA_DATA0                      ; zero it's attribute
     ply
 
     ; increase pointer to next byte in the set
@@ -1329,19 +1236,19 @@ displaytitlescreen:
     sta ZP_PTR_1+1
     jsr displaytileset
 
-    stz VERA_CTRL
+;    stz VERA_CTRL
     ldx #$9 ; color brown
     lda #$10
-    sta VERA_HIGH
+;    sta VERA_HIGH
 
     lda #<help0
     sta ZP_PTR_1
     lda #>help0
     sta ZP_PTR_1+1
     lda #23
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
 
     lda #<help1
@@ -1349,9 +1256,9 @@ displaytitlescreen:
     lda #>help1
     sta ZP_PTR_1+1
     lda #30
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
 
     lda #<help2
@@ -1359,9 +1266,9 @@ displaytitlescreen:
     lda #>help2
     sta ZP_PTR_1+1
     lda #32
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
 
     lda #<help3
@@ -1369,9 +1276,9 @@ displaytitlescreen:
     lda #>help3
     sta ZP_PTR_1+1
     lda #33
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
 
     lda #<help4
@@ -1379,9 +1286,9 @@ displaytitlescreen:
     lda #>help4
     sta ZP_PTR_1+1
     lda #34
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
 
     lda #<help5
@@ -1389,9 +1296,9 @@ displaytitlescreen:
     lda #>help5
     sta ZP_PTR_1+1
     lda #35
-    sta VERA_MID
+;    sta VERA_MID
     lda #50*2
-    sta VERA_LOW
+;    sta VERA_LOW
     jsr printverastring
     rts
 
@@ -1426,42 +1333,52 @@ cleartiles:
     rts
 
 printfield2:
-; prep variables for vera med/high bytes
-;    topleft address for first tile is 0x04000
-    lda #$40
-    sta vera_byte_mid
-    stz vera_byte_low
-
-; shift to the right (WIDTH_IN_TILES - fieldwidth) /2 positions *2 to compensate for attribute
+    lda #$00    ; low byte for video start
+    sta video
+    lda #$f8    ; high byte for video start
+    sta video+1
+    
+; Calculate start address
+; first calculate TX and TY (Tile (X,Y) position)
+; Center field within WIDTH_IN_TILES first
+; shift to the right (WIDTH_IN_TILES - fieldwidth) /2 positions
     lda #WIDTH_IN_TILES
     sec
     sbc fieldwidth
     lsr ; /2
-    asl ; *2 - so uneven widths result in an even address and we don't end up in parameter space of the TILEMAP 
-    sta vera_byte_low
-
-; shift down number of rows (HEIGHT_IN_TILES - fieldheight) /2 positions
+    ; A now contains Tile X position (TX)
+    tax         ; save TX
+; Center field vertically within HEIGHT_IN_TILES next
+; Shift down (HEIGHT_IN_TILES - fieldheight) / 2 positions   
     lda #HEIGHT_IN_TILES
     sec
     sbc fieldheight
     lsr ; /2
-    tax ; transfer number of rows down to counter
-@loop:
-    cpx #$0 ; any rows down (left)?
-    beq @done ; exit loop when x == 0
-    ; go 64 tiles further down - 64 * (1 address + 1 parameter of tile) = 128 / $80
-    lda vera_byte_low
+    ; A now contains Tile Y position (TY)
+; Now calculate video start position
+; Video start = (TY*80) + (TX * 2)
+;             = (TY * 64) + (TY * 16) + (TX * 2)
+;             = (TY << 6) + (TY << 4) + (TX << 1)
+    asl ; starting with TY, left in A from previous code
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta temp    ; temp now contains TY << 6
+    asl
+    asl
+    asl
+    asl
+    asl ; A contains TY << 4
     clc
-    adc #$80    ; add row <<<ADDRESS>>> height for exactly one row down
-    sta vera_byte_low
-    bcc @decrement  ; no need to change the high byte
-    lda vera_byte_mid
-    adc #$0     ; add carry (so +1)
-    sta vera_byte_mid
-@decrement: ; next row
-    dex
-    bra @loop
-@done:
+    adc temp
+    sta temp    ; temp now contains (TY << 6) + (TY << 4)
+    txa         ; retrieve TX
+    asl         ; * 2
+    clc
+    adc temp    ; A now contains video start address
+    sta video
 
 ; prepare the pointers to the back-end field data, so we know what to display
     lda ZP_PTR_FIELD
@@ -1470,22 +1387,58 @@ printfield2:
     sta ZP_PTR_1+1
 
 ; start displaying the selected field
-; (vera_byte_mid / vera_byte_low) is the address for the top-left position on-screen in the tile map
-    ldx #0 ; row counter
+; temp2 contains a loop counter for the actual display rows
+    lda #0
+    sta temp2
+
+    ldx #0 ; 0 == top row of 16x16 tile, 10 == bottom row of 16x16 tile
 @nextrow:
     ldy #0 ; column counter
-    ; prepare vera pointers for this row
-    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    lda vera_byte_mid
-    sta VERA_MID                        
-    lda vera_byte_low
-    sta VERA_LOW                       
-
-@row:
+@col:
     ; sweep the field, row by row, indexed by column y
-    lda (ZP_PTR_1),y
+    ; inputs are: y (column and also (y >> 1) == high/low byte in tile)
+    ;             x top/bottom row in tile  
+    ; returns quarter tile as video code index in A
+    jsr print_tilequarter
+    sta (video),y
+    iny
+    cpy fieldwidth
+    bne @col
+@checkrow:
+    lda temp2
+    clc
+    adc #1
+    sta temp2   ; increase display row counter
+    cmp fieldheight
+    beq @done
+    ; xor x
+    cpx #0
+    beq @xto1 
+    ldx #0
+    bra @xordone
+@xto1:
+    ldx #1
+@xordone:
+    ; next row, add 40 to video
+    lda video
+    clc
+    adc #SCREENWIDTH
+    sta video
+    bcc @nextrow
+    lda video+1
+    adc #0
+    sta video+1
+    bra @nextrow
+@done:
+    rts
+
+print_tilequarter:
+    ; inputs:
+    ; x,y,Z_PTR_1
+    phx
+    phy
+
+    lda (ZP_PTR_1),y    ; obtain content in field position
     cmp #'@'
     beq @player
     cmp #'+'
@@ -1501,84 +1454,65 @@ printfield2:
     cmp #0
     beq @ignore
     bra @wall
-@ignore:
-    ; ignore
-    lda #$0 ; black tile
-    sta VERA_DATA0
-    stz VERA_DATA0
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
+
 @player:
-    lda #$2
-    sta VERA_DATA0
-    stz VERA_DATA0
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
+    lda #TILE_PLAYER
+    bra @tiled
 @crate:
-    lda #$3
-    sta VERA_DATA0
-    stz VERA_DATA0
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
-@crateongoal:
-    lda #$5
-    sta VERA_DATA0
-    stz VERA_DATA0
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
+    lda #TILE_CRATE
+    bra @tiled
 @goal:
-    lda #$4
-    sta VERA_DATA0
-    stz VERA_DATA0
-    iny
-    cpy fieldwidth
-    bne @row
-    bra @endline
-
+    lda #TILE_GOAL
+    bra @tiled
+@crateongoal:
+    lda #TILE_CRATE_ON_GOAL
+    bra @tiled
+@ignore:
+    lda #TILE_IGNORE
+    bra @tiled
 @wall:
-    lda #$1 ; load tile 1 ; brick
-    sta VERA_DATA0
-    stz VERA_DATA0
+    lda #TILE_WALL
+    bra @tiled
 
-    iny
-    cpy fieldwidth
-    bne @row
-@endline:
-    ; advance pointer to next row in the field
-    lda ZP_PTR_1
+@tiled:
+    ; calculate offset in tile first
+    ; top-left:  y = 0, x = 0
+    ; top-right: y = 1, x = 0
+    ; btm-left:  y = 0, x = else (high bit)
+    ; btm-right: y = 1, x = else (high bit)
+    sty temp ; store low bit for later addition into A
+    txa
+    cmp #0
+    beq @hibitdone
+    ; x was <> 0, so make it 10
+    lda #10
+@hibitdone:
     clc
-    adc fieldwidth
-    sta ZP_PTR_1
-    bcc @checklastrow ; no carry, don't increment high byte on pointer
-    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-    adc #0
-    sta ZP_PTR_1+1
-@checklastrow:
-    ; last row?
-    ; increment vera pointer to next row
-    lda vera_byte_low
-    clc
-    adc #$80    ; add address delta to next row - 64 tiles * 2 = 128 / $80
-    sta vera_byte_low
-    bcc @next3  ; no need to change the high byte
-    lda vera_byte_mid
-    adc #$0     ; add carry (so +1)
-    sta vera_byte_mid
-@next3:
-    inx
-    cpx fieldheight
-    beq @nextsection
+    adc temp    ; A now contains offset into tile originally pointed to by y
 
-    jmp @nextrow
-@nextsection:
+    ; position to first tile
+    lda #<tiledata  ; load low byte of start tile address
+    sta ZP_PTR_2    ; store in temp pointer
+    lda #>tiledata
+    sta ZP_PTR_2+1  ; store high byte
+    ; add tile index (in y) to get first address of the needed tile
+    ; a tile contains 4 members, so need to >> 2 first
+    tya
+    asl
+    asl ; times 4, twice shift left
+    clc
+    adc ZP_PTR_2    ; add to low byte of temp pointer
+    sta ZP_PTR_2
+    bcc @tilestart
+    lda ZP_PTR_2+1
+    adc #0          ; add carry to the high byte
+    sta ZP_PTR_2+1
+@tilestart:
+    ; ZP_PTR_2 now points to the 16x16 tile, we can index the return by the value in temp
+    ldy temp
+    lda (ZP_PTR_2),y    ; A now contains the return-value; a quarter 8x8 of the larger 16x16 tile
+    ply
+    plx
     rts
 
 titlescreen:
@@ -1602,4 +1536,4 @@ crateongoal:
 .incbin "tiles/crateongoal.bin"
 LOADSTART:
 .incbin "levels.bin"
-RAMBANK:    // Start of variable DATA, used for copying new field into
+RAMBANK:    ; Start of variable DATA, used for copying new field into
