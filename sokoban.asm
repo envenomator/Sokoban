@@ -9,6 +9,7 @@ HEIGHT_IN_TILES = 15
 SCREENWIDTH     = 40       ; actual screenwidth
 SCREENHEIGHT    = 30       ; actual screenheight
 VIDEOSTART      = $F800    ; top-left memory address in Cerberus 2080
+FIRSTCHAR       = 128      ; first custom character to be part of a tileset
 
 KEY_UP          = $0B
 KEY_DOWN        = $0A
@@ -79,8 +80,24 @@ start:
     txs       ; init stack pointer (X => SP)
 
     jsr resetvars
-    jsr cleartiles
+    jsr cls
 
+    ; DEBUG CODE
+    ; show player top-left
+    jsr loadtiledata
+    lda #128
+    sta $F800
+    lda #129
+    sta $F801
+    lda #130
+    sta $F828
+    lda #131
+    sta $F829
+
+@loop:
+    bra @loop
+
+    ; END DEBUG CODE
     lda #$1
     sta currentlevel    ; start with level 1
 
@@ -89,7 +106,7 @@ start:
     ;bcc @continue
     ;rts                 ; pressed 'q'
 @continue:
-    jsr cleartiles      ; cls tiles
+    jsr cls      ; cls tiles
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
 
@@ -131,11 +148,11 @@ keyloop:
 @handle_reset:
     jsr askreset
     bcs @resetgame
-    jsr cleartiles
+    jsr cls
     jsr printfield2
     bra @done
 @resetgame:
-    jsr cleartiles
+    jsr cls
     jsr resetvars
     jsr initfield
     jsr printfield2
@@ -148,7 +165,7 @@ keyloop:
 @handle_quit:
     jsr askquit
     bcs @exit
-    jsr cleartiles
+    jsr cls
     jsr printfield2
     bra @done
 @exit:
@@ -177,7 +194,7 @@ keyloop:
     beq @gotomenu   ; select another game
     inc currentlevel ; next level
     jsr resetvars
-    jsr cleartiles
+    jsr cls
 
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
@@ -1302,7 +1319,7 @@ displaytitlescreen:
     jsr printverastring
     rts
 
-cleartiles:
+cls:
     ; Fill the entire screen with empty tile (space)
     lda #$0
     sta temp            ; low byte to temp
@@ -1330,6 +1347,45 @@ cleartiles:
     inx
     cpx #SCREENHEIGHT
     bne @outer
+    rts
+
+loadtiledata:
+    ; loads tile data into character memory, starting from FIRSTCHAR
+    lda #FIRSTCHAR
+    sta temp
+    lda #$f0
+    sta temp+1     ; temp is the destination into video character memory
+
+    lda #<tiledata
+    sta temp2
+    lda #>tiledata
+    sta temp2+1    ; temp2 is the source of the data
+    
+    ldx #0
+    ldy #0
+@loop:
+    lda (temp2),y
+    sta (temp),y
+    inx
+    ; +1 to both pointers
+    clc
+    lda temp
+    adc #1
+    sta temp
+    lda temp+1
+    adc #0
+    sta temp+1
+
+    clc
+    lda temp2
+    adc #1
+    sta temp2
+    lda temp2+1
+    adc #0
+    sta temp2+1
+
+    cpx #(6 * 16 * 2)   ; 6 tiles times 16 x 16 bit, or 6 * 16 * 2 byte
+    bne @loop
     rts
 
 printfield2:
@@ -1491,7 +1547,7 @@ get_tilequarter:
     adc temp    ; A now contains offset into tile originally pointed to by y. Range is 0 - 3 ($00 - $11)
 
     ; tile 0: video characters 128,129,130,131. So 128 + 0-3
-    adc #128    ; character number 128 is top-left 8x8 of tile 0, add the 0-3 index to it previously calculated
+    adc #FIRSTCHAR    ; character number 128 is top-left 8x8 of tile 0, add the 0-3 index to it previously calculated
     sta temp
     ply        ; return tile ID
     tya
@@ -1507,19 +1563,113 @@ messagescreen:
 .incbin "tiles/messagescreen.bin"
 completescreen:
 .incbin "tiles/complete.bin"
+
+; tile data
+; each tile consists of 16x16, 4x8x8 laid out sequentially
+; this will need to be loaded dynamically into character memory at program start
 tiledata:
-black:
-.incbin "tiles/black.bin"
-Brick:
-.incbin "tiles/brick.bin"
 player:
-.incbin "tiles/player.bin"
+    .byte %00000000,%00000000
+    .byte %00000011,%10000000
+    .byte %00000111,%11000000
+    .byte %00001000,%00100000
+    .byte %00001111,%11100000
+    .byte %00000110,%11000000
+    .byte %00000011,%10000000
+    .byte %00000111,%11000000
+    .byte %00001110,%11100000
+    .byte %00011111,%11110000
+    .byte %00011101,%01110000
+    .byte %00111111,%11111000
+    .byte %00110111,%11011000
+    .byte %00000110,%11000000
+    .byte %00000110,%11000000
+    .byte %00001110,%11100000
 crate:
-.incbin "tiles/crate.bin"
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
 goal:
-.incbin "tiles/goal.bin"
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
 crateongoal:
-.incbin "tiles/crateongoal.bin"
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+Brick:
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+black:
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
+    .byte %11111111,%11111111
 LOADSTART:
 .incbin "levels.bin"
 RAMBANK:    ; Start of variable DATA, used for copying new field into
