@@ -1399,7 +1399,7 @@ printfield2:
     ; inputs are: y (column and also (y >> 1) == high/low byte in tile)
     ;             x top/bottom row in tile  
     ; returns quarter tile as video code index in A
-    jsr print_tilequarter
+    jsr get_tilequarter
     sta (video),y
     iny
     cpy fieldwidth
@@ -1432,7 +1432,7 @@ printfield2:
 @done:
     rts
 
-print_tilequarter:
+get_tilequarter:
     ; inputs:
     ; x,y,Z_PTR_1
     phx
@@ -1488,30 +1488,16 @@ print_tilequarter:
     lda #10
 @hibitdone:
     clc
-    adc temp    ; A now contains offset into tile originally pointed to by y
+    adc temp    ; A now contains offset into tile originally pointed to by y. Range is 0 - 3 ($00 - $11)
 
-    ; position to first tile
-    lda #<tiledata  ; load low byte of start tile address
-    sta ZP_PTR_2    ; store in temp pointer
-    lda #>tiledata
-    sta ZP_PTR_2+1  ; store high byte
-    ; add tile index (in y) to get first address of the needed tile
-    ; a tile contains 4 members, so need to >> 2 first
+    ; tile 0: video characters 128,129,130,131. So 128 + 0-3
+    adc #128    ; character number 128 is top-left 8x8 of tile 0, add the 0-3 index to it previously calculated
+    sta temp
+    ply        ; return tile ID
     tya
     asl
-    asl ; times 4, twice shift left
-    clc
-    adc ZP_PTR_2    ; add to low byte of temp pointer
-    sta ZP_PTR_2
-    bcc @tilestart
-    lda ZP_PTR_2+1
-    adc #0          ; add carry to the high byte
-    sta ZP_PTR_2+1
-@tilestart:
-    ; ZP_PTR_2 now points to the 16x16 tile, we can index the return by the value in temp
-    ldy temp
-    lda (ZP_PTR_2),y    ; A now contains the return-value; a quarter 8x8 of the larger 16x16 tile
-    ply
+    asl        ; tile ID*4(8x8)
+    adc temp   ; A now contains the actual video character to display at this 8x8 quarter in the larger 16x16
     plx
     rts
 
