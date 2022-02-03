@@ -83,7 +83,7 @@ start:
     jsr cls
 
     ; DEBUG CODE
-    ; show player top-left
+   ; show player top-left
     jsr loadtiledata
     lda #128
     sta $F800
@@ -93,6 +93,38 @@ start:
     sta $F828
     lda #131
     sta $F829
+    lda #132
+    sta $F802
+    lda #133
+    sta $F803
+    lda #134
+    sta $F82a
+    lda #135
+    sta $F82b
+    lda #136
+    sta $F804
+    lda #137
+    sta $F805
+    lda #138
+    sta $F82c
+    lda #139
+    sta $F82d
+    lda #140
+    sta $F806
+    lda #141
+    sta $F807
+    lda #142
+    sta $F82e
+    lda #143
+    sta $F82f
+    lda #144
+    sta $F808
+    lda #145
+    sta $F809
+    lda #146
+    sta $F830
+    lda #147
+    sta $F831
 
 @loop:
     bra @loop
@@ -1351,9 +1383,9 @@ cls:
 
 loadtiledata:
     ; loads tile data into character memory, starting from FIRSTCHAR
-    lda #FIRSTCHAR
+    lda #00
     sta temp
-    lda #$f0
+    lda #$f4        ; $F400 = F000 + (128 * 8) - start of FIRSTCHAR definition
     sta temp+1     ; temp is the destination into video character memory
 
     lda #<tiledata
@@ -1569,24 +1601,43 @@ completescreen:
 ; this will need to be loaded dynamically into character memory at program start
 tiledata:
 player:
-    .byte %00000000,%00000000
-    .byte %00000011,%10000000
-    .byte %00000111,%11000000
-    .byte %00001000,%00100000
-    .byte %00001111,%11100000
-    .byte %00000110,%11000000
-    .byte %00000011,%10000000
-    .byte %00000111,%11000000
-    .byte %00001110,%11100000
-    .byte %00011111,%11110000
-    .byte %00011101,%01110000
-    .byte %00111111,%11111000
-    .byte %00110111,%11011000
-    .byte %00000110,%11000000
-    .byte %00000110,%11000000
-    .byte %00001110,%11100000
+    .byte %00000000
+    .byte %00000011
+    .byte %00000111
+    .byte %00001101
+    .byte %00001111
+    .byte %00000110
+    .byte %00000011
+    .byte %00000111
+
+    .byte %00000000
+    .byte %10000000
+    .byte %11000000
+    .byte %01100000
+    .byte %11100000
+    .byte %11000000
+    .byte %10000000
+    .byte %11000000
+    
+    .byte %00001110
+    .byte %00011111
+    .byte %00011101
+    .byte %00111111
+    .byte %00110111
+    .byte %00000110
+    .byte %00000110
+    .byte %00001110
+
+    .byte %11100000
+    .byte %11110000
+    .byte %01110000
+    .byte %11111000
+    .byte %11011000
+    .byte %11000000
+    .byte %11000000
+    .byte %11100000
 crate:
-    .byte %11111111,%11111111
+    .byte %01111111,%11111111
     .byte %11111111,%11111111
     .byte %11111111,%11111111
     .byte %11111111,%11111111
@@ -1618,7 +1669,7 @@ goal:
     .byte %11111111,%11111111
     .byte %11111111,%11111111
     .byte %11111111,%11111111
-    .byte %11111111,%11111111
+    .byte %11111111,%11111110
 crateongoal:
     .byte %11111111,%11111111
     .byte %11111111,%11111111
@@ -1638,38 +1689,23 @@ crateongoal:
     .byte %11111111,%11111111
 Brick:
     .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
+    .byte %11100111,%11100111
     .byte %11111111,%11111111
 black:
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
-    .byte %11111111,%11111111
+    .byte $0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0
 LOADSTART:
 .incbin "levels.bin"
 RAMBANK:    ; Start of variable DATA, used for copying new field into
