@@ -1,68 +1,28 @@
 ; constants
-NEWLINE = $0D
-UPPERCASE = $8E
-CLEARSCREEN = 147
-LEVELHEADER = 12
-MAXUNDO = 10
-WIDTH_IN_TILES = 20        ; screen width/height in 16x16 tiles
-HEIGHT_IN_TILES = 15
-SCREENWIDTH     = 40       ; actual screenwidth
-SCREENHEIGHT    = 30       ; actual screenheight
-VIDSTART        = $F800    ; top-left memory address in Cerberus 2080
-FIRSTCHAR       = 128      ; first custom character to be part of a tileset
-
-KEY_UP          = $0B
-KEY_DOWN        = $0A
-KEY_LEFT        = $08
-KEY_RIGHT       = $15
-KEY_ENTER       = $0D
-KEY_Q           = $51
-KEY_R           = $52
-KEY_M           = $4D
-KEY_N           = $4E
-KEY_U           = $55
-
-; 16x16 Tile indexes, will later be translated to 8x8 video characters with codes 0-255
-TILE_PLAYER         = $0
+LEVELHEADER         = 12
+MAXUNDO             = 10
+WIDTH_IN_TILES      = 20        ; screen width/height in 16x16 tiles
+HEIGHT_IN_TILES     = 15
+SCREENWIDTH         = 40       ; actual screenwidth
+SCREENHEIGHT        = 30       ; actual screenheight
+VIDSTART            = $F800    ; top-left memory address in Cerberus 2080
+FIRSTCHAR           = 128      ; first custom character to be part of a tileset
+KEY_UP              = $0B
+KEY_DOWN            = $0A
+KEY_LEFT            = $08
+KEY_RIGHT           = $15
+KEY_ENTER           = $0D
+KEY_Q               = $51
+KEY_R               = $52
+KEY_M               = $4D
+KEY_N               = $4E
+KEY_U               = $55
+TILE_PLAYER         = $0 ; 16x16 Tile indexes, will later be translated to 8x8 video characters with codes 0-255
 TILE_CRATE          = $1
 TILE_GOAL           = $2
 TILE_CRATE_ON_GOAL  = $3
 TILE_WALL           = $4
 TILE_IGNORE         = $5
-
-.setcpu "65C02"
-.segment "CODE"
-
-   jmp start
-
-; string constants
-quitaskmessage:      .byte "really quit? y/n",0
-selectmessage:    .byte "select a level (1-",0
-selectendmessage: .byte "): ",0
-clear:            .byte "                                        ",0
-resetmessage:     .byte "really reset level? y/n",0
-quitmessage:      .byte "press q to quit",0
-winstatement:     .byte "level complete! new level? y/n",0
-help0:            .byte "(c)2022 venom",0
-help1:            .byte "keyboard shortcuts:",0
-help2:            .byte "cursor - moves player",0
-help3:            .byte "     q - quit",0
-help4:            .byte "     u - undo move(s)",0
-help5:            .byte "     r - reset level",0
-done0:            .byte "m(enu)",0
-done1:            .byte "n(ext)",0
-done2:            .byte "q(uit)",0
-
-; variables that the program uses during execution
-currentlevel:   .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
-no_levels:      .byte 0 ; will be read by initfield
-no_goals:       .byte 0 ; will be read by initfield, depending on the currentlevel
-no_goalsreached:.byte 0 ; static now, reset for each game
-fieldwidth:     .byte 0 ; will be read by initfield, depending on the currentlevel
-fieldheight:    .byte 0 ; will be read by initfield, depending on the currentlevel
-undostack:      .byte 0,0,0,0,0,0,0,0,0,0
-undoindex:      .byte 0
-undocounter:    .byte 0
 
     .zeropage
 xpos:           .res 1
@@ -78,14 +38,46 @@ temp:           .res 2  ; used for temp 8/16 bit storage, or just local temp var
 temp2:          .res 2
 video:          .res 2
 
-    .code
+.setcpu "65C02"
+.segment "CODE"
+
+   jmp start
+
+; strings 
+quitaskmessage:   .byte "really quit? y/n",0
+selectmessage:    .byte "select a level (1-",0
+selectendmessage: .byte "): ",0
+clear:            .byte "                                        ",0
+resetmessage:     .byte "really reset level? y/n",0
+quitmessage:      .byte "press q to quit",0
+winstatement:     .byte "level complete! new level? y/n",0
+help0:            .byte "(c)2022 venom",0
+help1:            .byte "keyboard shortcuts:",0
+help2:            .byte "cursor - moves player",0
+help3:            .byte "     q - quit",0
+help4:            .byte "     u - undo move(s)",0
+help5:            .byte "     r - reset level",0
+done0:            .byte "m(enu)",0
+done1:            .byte "n(ext)",0
+done2:            .byte "q(uit)",0
+; variables that the program uses during execution
+currentlevel:     .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
+no_levels:        .byte 0 ; will be read by initfield
+no_goals:         .byte 0 ; will be read by initfield, depending on the currentlevel
+no_goalsreached:  .byte 0 ; static now, reset for each game
+fieldwidth:       .byte 0 ; will be read by initfield, depending on the currentlevel
+fieldheight:      .byte 0 ; will be read by initfield, depending on the currentlevel
+undostack:        .byte 0,0,0,0,0,0,0,0,0,0
+undoindex:        .byte 0
+undocounter:      .byte 0
+
 start:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
     txs       ; init stack pointer (X => SP)
 
     jsr resetvars
-    jsr cls
+    jsr con_cls
 
     ; DEBUG CODE
    ; show player top-left
@@ -143,7 +135,7 @@ start:
     ;bcc @continue
     ;rts                 ; pressed 'q'
 @continue:
-    jsr cls      ; cls tiles
+    jsr con_cls      ; con_cls tiles
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
 
@@ -185,11 +177,11 @@ keyloop:
 @handle_reset:
     jsr askreset
     bcs @resetgame
-    jsr cls
+    jsr con_cls
     jsr printfield2
     bra @done
 @resetgame:
-    jsr cls
+    jsr con_cls
     jsr resetvars
     jsr initfield
     jsr printfield2
@@ -202,7 +194,7 @@ keyloop:
 @handle_quit:
     jsr askquit
     bcs @exit
-    jsr cls
+    jsr con_cls
     jsr printfield2
     bra @done
 @exit:
@@ -231,7 +223,7 @@ keyloop:
     beq @gotomenu   ; select another game
     inc currentlevel ; next level
     jsr resetvars
-    jsr cls
+    jsr con_cls
 
     jsr initfield       ; load correct startup values for selected field
     jsr printfield2
@@ -1356,35 +1348,6 @@ displaytitlescreen:
     jsr printverastring
     rts
 
-cls:
-    ; Fill the entire screen with empty tile (space)
-    lda #$0
-    sta temp            ; low byte to temp
-    lda #$f8
-    sta temp+1          ; high byte to temp
-
-    ldx #$0
-@outer:
-    lda #$32            ; space character
-    ldy #$0
-@inner:
-    sta (temp),y
-    iny
-    cpy #SCREENWIDTH
-    bne @inner          ; next column
-    clc
-    lda temp
-    adc #SCREENWIDTH             ; next row
-    sta temp
-    bcc @nexttemp
-    lda temp+1
-    adc #$0             ; add the carry (1) to the high byte
-    sta temp+1
-@nexttemp:
-    inx
-    cpx #SCREENHEIGHT
-    bne @outer
-    rts
 
 loadtiledata:
     ; loads tile data into character memory, starting from FIRSTCHAR
