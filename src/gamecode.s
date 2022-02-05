@@ -1,4 +1,5 @@
 ; constants
+NEWLINE             = $0D
 LEVELHEADER         = 12
 MAXUNDO             = 10
 WIDTH_IN_TILES      = 20        ; screen width/height in 16x16 tiles
@@ -77,56 +78,58 @@ start:
     txs       ; init stack pointer (X => SP)
 
     jsr resetvars
-    jsr con_cls
 
     ; DEBUG CODE
    ; show player top-left
-    jsr loadtiledata
-    lda #128
-    sta $F800
-    lda #129
-    sta $F801
-    lda #130
-    sta $F828
-    lda #131
-    sta $F829
-    lda #132
-    sta $F802
-    lda #133
-    sta $F803
-    lda #134
-    sta $F82a
-    lda #135
-    sta $F82b
-    lda #136
-    sta $F804
-    lda #137
-    sta $F805
-    lda #138
-    sta $F82c
-    lda #139
-    sta $F82d
-    lda #140
-    sta $F806
-    lda #141
-    sta $F807
-    lda #142
-    sta $F82e
-    lda #143
-    sta $F82f
-    lda #144
-    sta $F808
-    lda #145
-    sta $F809
-    lda #146
-    sta $F830
-    lda #147
-    sta $F831
-
-@loop:
-    bra @loop
+    ;jsr loadtiledata
+    ;lda #128
+    ;sta $F800
+    ;lda #129
+    ;sta $F801
+    ;lda #130
+    ;sta $F828
+    ;lda #131
+    ;sta $F829
+    ;lda #132
+    ;sta $F802
+    ;lda #133
+    ;sta $F803
+    ;lda #134
+    ;sta $F82a
+    ;lda #135
+    ;sta $F82b
+    ;lda #136
+    ;sta $F804
+    ;lda #137
+    ;sta $F805
+    ;lda #138
+    ;sta $F82c
+    ;lda #139
+    ;sta $F82d
+    ;lda #140
+    ;sta $F806
+    ;lda #141
+    ;sta $F807
+    ;lda #142
+    ;sta $F82e
+    ;lda #143
+    ;sta $F82f
+    ;lda #144
+    ;sta $F808
+    ;lda #145
+    ;sta $F809
+    ;lda #146
+    ;sta $F830
+    ;lda #147
+    ;sta $F831
+;
+;@loop:
+;    bra @loop
 
     ; END DEBUG CODE
+
+    jsr con_init
+    
     lda #$1
     sta currentlevel    ; start with level 1
 
@@ -135,9 +138,8 @@ start:
     ;bcc @continue
     ;rts                 ; pressed 'q'
 @continue:
-    jsr con_cls      ; con_cls tiles
     jsr initfield       ; load correct startup values for selected field
-    jsr printfield2
+    jsr printfield
 
 keyloop:
     jsr GETIN
@@ -177,14 +179,12 @@ keyloop:
 @handle_reset:
     jsr askreset
     bcs @resetgame
-    jsr con_cls
-    jsr printfield2
+    jsr printfield
     bra @done
 @resetgame:
-    jsr con_cls
     jsr resetvars
     jsr initfield
-    jsr printfield2
+    jsr printfield
     bra keyloop
 @checkquit:
     cmp #KEY_Q
@@ -194,8 +194,7 @@ keyloop:
 @handle_quit:
     jsr askquit
     bcs @exit
-    jsr con_cls
-    jsr printfield2
+    jsr printfield
     bra @done
 @exit:
     rts
@@ -223,10 +222,9 @@ keyloop:
     beq @gotomenu   ; select another game
     inc currentlevel ; next level
     jsr resetvars
-    jsr con_cls
 
     jsr initfield       ; load correct startup values for selected field
-    jsr printfield2
+    jsr printfield
 @donenextkey:
     jmp keyloop
 @quit:
@@ -446,7 +444,7 @@ handle_undo_right:
     
     jsr movecrateonfield
 @done:
-    jsr printfield2
+    jsr printfield
     rts
 
 handleleft:
@@ -520,7 +518,7 @@ handle_undo_left:
     
     jsr movecrateonfield
 @done:
-    jsr printfield2
+    jsr printfield
     rts
 
 handleup:
@@ -598,7 +596,7 @@ handle_undo_up:
     
     jsr movecrateonfield
 @done:
-    jsr printfield2
+    jsr printfield
     rts
 
 handledown:
@@ -676,7 +674,7 @@ handle_undo_down:
     
     jsr movecrateonfield
 @done:
-    jsr printfield2
+    jsr printfield
     rts
 
 handlemove:
@@ -729,7 +727,7 @@ handlemove:
     jsr push_undostack
 
 @movecomplete:
-    jsr printfield2
+    jsr printfield
     rts
 
 @ignore: ; nothing to move
@@ -1388,7 +1386,7 @@ loadtiledata:
     bne @loop
     rts
 
-printfield2:
+outputfield2:
     lda #$00    ; low byte for video start
     sta video
     lda #$f8    ; high byte for video start
@@ -1555,6 +1553,73 @@ get_tilequarter:
     asl        ; tile ID*4(8x8)
     adc temp   ; A now contains the actual video character to display at this 8x8 quarter in the larger 16x16
     plx
+    rts
+
+printfield:
+    ; console routines only
+    ; depends only on
+    ; - field label for start of field
+
+    jsr con_cls
+
+    lda ZP_PTR_FIELD
+    sta ZP_PTR_1
+    lda ZP_PTR_FIELD+1
+    sta ZP_PTR_1+1
+    ldx #0 ; row counter
+@nextrow:
+    ldy #0 ; column counter
+@row:
+    lda (ZP_PTR_1),y
+    cmp #'@'
+    beq @character
+    cmp #'+'
+    beq @character
+    bra @normalcolor
+@character:
+    jsr con_printchar
+    iny
+    cpy fieldwidth
+    bne @row
+    bra @endline
+@normalcolor:
+    cmp #0  ; zero ending?
+    beq @skip
+    jsr con_printchar
+@skip:
+    iny
+    cpy fieldwidth
+    bne @row
+@endline:
+    lda #NEWLINE
+    jsr con_printchar
+    
+    ; advance pointer to next row
+    lda ZP_PTR_1
+    clc
+    adc fieldwidth
+    sta ZP_PTR_1
+    bcc @checklastrow ; no carry, don't increment high byte on pointer
+    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+    clc
+    adc #1
+    sta ZP_PTR_1+1
+@checklastrow:
+    ; last row?
+    inx
+    cpx fieldheight
+    bne @nextrow
+
+    ; print quit message at the end of the field
+    lda #NEWLINE
+    jsr con_printchar
+
+    lda #<quitmessage
+    sta strptr
+    lda #>quitmessage
+    sta strptr+1
+    jsr con_print
+
     rts
 
 con_init:
