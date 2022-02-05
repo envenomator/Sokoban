@@ -8,7 +8,7 @@ WIDTH_IN_TILES = 20        ; screen width/height in 16x16 tiles
 HEIGHT_IN_TILES = 15
 SCREENWIDTH     = 40       ; actual screenwidth
 SCREENHEIGHT    = 30       ; actual screenheight
-VIDEOSTART      = $F800    ; top-left memory address in Cerberus 2080
+VIDSTART        = $F800    ; top-left memory address in Cerberus 2080
 FIRSTCHAR       = 128      ; first custom character to be part of a tileset
 
 KEY_UP          = $0B
@@ -64,16 +64,21 @@ undostack:      .byte 0,0,0,0,0,0,0,0,0,0
 undoindex:      .byte 0
 undocounter:    .byte 0
 
-; usage of zeropage address space:
-ZP_PTR_1      = $1 ; temporary pointer
-ZP_PTR_2      = $3 ; temporary pointer
-ZP_PTR_3      = $5 ; position of player
-ZP_PTR_FIELD  = $7
-temp          = $9  ; used for temp 8/16 bit storage $9/$A, or just local temp variables
-temp2         = $B
-ZP_PTR_UNDO   = $D ; used to point to the 'undo stack'
-video         = $F ; used to point to the actual video address
+    .zeropage
+xpos:           .res 1
+ypos:           .res 1
+conptr:         .res 2
+strptr:         .res 2 ; for program use
+ZP_PTR_1:       .res 2
+ZP_PTR_2:       .res 2
+ZP_PTR_3:       .res 2  ; position of player
+ZP_PTR_FIELD:   .res 2
+ZP_PTR_UNDO:    .res 2  ; used to point to the 'undo stack'
+temp:           .res 2  ; used for temp 8/16 bit storage, or just local temp variables
+temp2:          .res 2
+video:          .res 2
 
+    .code
 start:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
@@ -1587,6 +1592,197 @@ get_tilequarter:
     asl        ; tile ID*4(8x8)
     adc temp   ; A now contains the actual video character to display at this 8x8 quarter in the larger 16x16
     plx
+    rts
+
+con_init:
+    ; initializes the console variables
+    ; reset to X,Y = 0,0
+    pha
+    phx
+    phy
+    stz xpos
+    stz ypos
+    lda #<VIDSTART
+    sta conptr
+    lda #>VIDSTART
+    sta conptr+1
+    ply
+    plx
+    pla
+    rts
+
+con_cls:
+    ; Fill the entire screen with empty tile (space)
+    ; and reset console to 0,0
+    pha
+    phx
+    phy
+    jsr con_init
+
+    ldx #$0
+@outer:
+    lda #' '            ; space character
+    ldy #$0
+@inner:
+    sta (conptr),y
+    iny
+    cpy #SCREENWIDTH
+    bne @inner          ; next column
+    clc
+    lda conptr
+    adc #SCREENWIDTH             ; next row
+    sta conptr
+    bcc @next
+    lda conptr+1
+    adc #$0             ; add the carry (1) to the high byte
+    sta conptr+1
+@next:
+    inx
+    cpx #SCREENHEIGHT
+    bne @outer
+    
+    jsr con_init
+    ply
+    plx
+    pla
+    rts
+
+con_gotox:
+    pha
+    phx
+    phy
+    ldy ypos
+    jsr con_gotoxy
+    ply
+    plx
+    pla
+    rts
+
+con_gotoxy:
+    ; input .x == x position
+    ; input .y == y position
+    pha
+    phx
+    phy
+    cpx #SCREENWIDTH
+    bcs @done           ; >= to WIDTH, set carry and exit
+    cpy #SCREENHEIGHT
+    bcs @done           ; >= to HEIGHT, set carry and exit
+    stx xpos
+    sty ypos
+
+    lda #SCREENWIDTH
+    sta conptr      ; FAC1 == conptr(low), FAC2 = ypos. FAC1 gets clobbered to final low byte of result
+    ; multiply ypos * SCREENWIDTH, store in conptr
+@mul8:
+    lda #$00
+    ldx #$08
+    clc
+@m0:
+    bcc @m1
+    clc
+    adc ypos
+@m1:
+    ror
+    ror conptr
+    dex
+    bpl @m0
+    sta conptr+1
+    ; result now in conptr / conptr+1
+    ; Add both video start address (F800) and xpos to conptr.
+    ; As xpos <40, we can use the low byte immediately
+    clc
+    lda conptr
+    adc xpos
+    sta conptr
+    lda conptr+1
+    adc #$F8
+    sta conptr+1
+@done:
+    ply
+    plx
+    pla
+    rts
+
+con_print:
+    ; prints zero-terminated string pointed to by strptr in zeropage
+    pha
+    phx
+    phy
+
+    ldy #0
+@loop:
+    lda (strptr),y
+    beq @done
+    jsr con_printchar 
+    iny
+    bra @loop
+@done:
+    ply
+    plx
+    pla
+    rts
+
+con_printchar:
+    ; prints character from A to the current X,Y coordinate in zeropage
+    ; X,Y is always a previously checked valid coordinate
+    pha
+    phx
+    phy
+
+    cmp #$d ; CR
+    beq @CRLF
+    cmp #$a ; LF
+    beq @CRLF
+
+    ; print normally
+    ldy #0
+    sta (conptr),y
+    ; update position and check validity
+    ; wrap around at end of screen to 0,0
+    ; X = X + 1
+    lda xpos
+    cmp #SCREENWIDTH-1
+    beq @CRLF
+    clc
+    adc #1
+    sta xpos
+    bra @nextptr
+@CRLF:
+    lda #SCREENWIDTH
+    sec
+    sbc xpos            ; move down SCREENWIDTH - xpos characters
+    clc
+    adc conptr          ; add to low byte of pointer
+    sta conptr
+    lda conptr+1
+    adc #0
+    sta conptr+1        ; add to high byte of pointer
+
+    ; now reset x and check y next
+    stz xpos
+    lda ypos
+    cmp #SCREENHEIGHT-1
+    bne @nextrow
+    ; return to 0,0
+    jsr con_init
+    bra @done
+@nextrow:
+    inc ypos
+    bra @done
+@nextptr:
+    lda conptr
+    clc
+    adc #1
+    sta conptr
+    bcc @done
+    lda conptr+1
+    adc #0
+    sta conptr+1
+@done:
+    ply
+    plx
+    pla
     rts
 
 titlescreen:
