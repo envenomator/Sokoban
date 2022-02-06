@@ -38,7 +38,7 @@ checkError = False
 blockSize = 10
 
 try:
-  with serial.Serial(serialport) as ser: ## 9600,8,N,1
+  with serial.Serial(serialport, 115200) as ser: ## 9600,8,N,1
     print('Opening serial port...')
     time.sleep(3)
     print('Writing file to serial port')

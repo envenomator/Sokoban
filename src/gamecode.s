@@ -18,14 +18,17 @@ KEY_R               = $52
 KEY_M               = $4D
 KEY_N               = $4E
 KEY_U               = $55
-TILE_PLAYER         = $0 ; 16x16 Tile indexes, will later be translated to 8x8 video characters with codes 0-255
-TILE_CRATE          = $1
-TILE_GOAL           = $2
-TILE_CRATE_ON_GOAL  = $3
-TILE_WALL           = $4
-TILE_IGNORE         = $5
+TILE_PLAYER         = 0   ; start video character, top-left position of each tile
+TILE_CRATE          = 1
+TILE_GOAL           = 2
+TILE_CRATE_ON_GOAL  = 3
+TILE_WALL           = 4
+TILE_IGNORE         = 5
 
     .zeropage
+    .exportzp ZP_PTR_1
+    .exportzp video
+
 xpos:           .res 1
 ypos:           .res 1
 conptr:         .res 2
@@ -38,6 +41,10 @@ ZP_PTR_UNDO:    .res 2  ; used to point to the 'undo stack'
 temp:           .res 2  ; used for temp 8/16 bit storage, or just local temp variables
 temp2:          .res 2
 video:          .res 2
+tempwidth:      .res 1
+tempheight:     .res 1
+tileindex:      .res 1  ; used during calculation of presention tile quarter 0-3
+fieldindex:     .res 1  ; used for column-indexing the fieldpointer
 
 .setcpu "65C02"
 .segment "CODE"
@@ -78,10 +85,10 @@ start:
     txs       ; init stack pointer (X => SP)
 
     jsr resetvars
+    jsr loadtiledata
 
     ; DEBUG CODE
    ; show player top-left
-    ;jsr loadtiledata
     ;lda #128
     ;sta $F800
     ;lda #129
@@ -139,7 +146,7 @@ start:
     ;rts                 ; pressed 'q'
 @continue:
     jsr initfield       ; load correct startup values for selected field
-    jsr printfield
+    jsr printgraphics
 
 keyloop:
     jsr GETIN
@@ -179,12 +186,12 @@ keyloop:
 @handle_reset:
     jsr askreset
     bcs @resetgame
-    jsr printfield
+    jsr printgraphics
     bra @done
 @resetgame:
     jsr resetvars
     jsr initfield
-    jsr printfield
+    jsr printgraphics
     bra keyloop
 @checkquit:
     cmp #KEY_Q
@@ -194,7 +201,7 @@ keyloop:
 @handle_quit:
     jsr askquit
     bcs @exit
-    jsr printfield
+    jsr printgraphics
     bra @done
 @exit:
     rts
@@ -224,7 +231,7 @@ keyloop:
     jsr resetvars
 
     jsr initfield       ; load correct startup values for selected field
-    jsr printfield
+    jsr printgraphics
 @donenextkey:
     jmp keyloop
 @quit:
@@ -444,7 +451,7 @@ handle_undo_right:
     
     jsr movecrateonfield
 @done:
-    jsr printfield
+    jsr printgraphics
     rts
 
 handleleft:
@@ -518,7 +525,7 @@ handle_undo_left:
     
     jsr movecrateonfield
 @done:
-    jsr printfield
+    jsr printgraphics
     rts
 
 handleup:
@@ -596,7 +603,7 @@ handle_undo_up:
     
     jsr movecrateonfield
 @done:
-    jsr printfield
+    jsr printgraphics
     rts
 
 handledown:
@@ -674,7 +681,7 @@ handle_undo_down:
     
     jsr movecrateonfield
 @done:
-    jsr printfield
+    jsr printgraphics
     rts
 
 handlemove:
@@ -727,7 +734,7 @@ handlemove:
     jsr push_undostack
 
 @movecomplete:
-    jsr printfield
+    jsr printgraphics
     rts
 
 @ignore: ; nothing to move
@@ -1386,53 +1393,55 @@ loadtiledata:
     bne @loop
     rts
 
-outputfield2:
-    lda #$00    ; low byte for video start
-    sta video
-    lda #$f8    ; high byte for video start
-    sta video+1
-    
+printgraphics:
 ; Calculate start address
 ; first calculate TX and TY (Tile (X,Y) position)
+; resulting address = $F800 + (TY*80) + (TX *2)
 ; Center field within WIDTH_IN_TILES first
 ; shift to the right (WIDTH_IN_TILES - fieldwidth) /2 positions
     lda #WIDTH_IN_TILES
     sec
     sbc fieldwidth
     lsr ; /2
+    asl ; TX * 2, round down by shifting left first
     ; A now contains Tile X position (TX)
-    tax         ; save TX
+    sta temp
 ; Center field vertically within HEIGHT_IN_TILES next
 ; Shift down (HEIGHT_IN_TILES - fieldheight) / 2 positions   
     lda #HEIGHT_IN_TILES
     sec
     sbc fieldheight
     lsr ; /2
+    sta temp2
     ; A now contains Tile Y position (TY)
 ; Now calculate video start position
-; Video start = (TY*80) + (TX * 2)
-;             = (TY * 64) + (TY * 16) + (TX * 2)
-;             = (TY << 6) + (TY << 4) + (TX << 1)
-    asl ; starting with TY, left in A from previous code
-    asl
-    asl
-    asl
-    asl
-    asl
-    sta temp    ; temp now contains TY << 6
-    asl
-    asl
-    asl
-    asl
-    asl ; A contains TY << 4
+; FAC1 =
+    lda #SCREENWIDTH*2
+    sta video      ; FAC1 == video(low), FAC2 = temp2. FAC1 gets clobbered to final low byte of result
+    ; multiply ypos * SCREENWIDTH, store in conptr
+@mul8:
+    lda #$00
+    ldx #$08
     clc
-    adc temp
-    sta temp    ; temp now contains (TY << 6) + (TY << 4)
-    txa         ; retrieve TX
-    asl         ; * 2
+@m0:
+    bcc @m1
     clc
-    adc temp    ; A now contains video start address
+    adc temp2     ; FAC2
+@m1:
+    ror
+    ror video   ; FAC1
+    dex
+    bpl @m0
+    sta video+1
+    ; result now in video / video+1
+    ; Add both video start address (F800) and xpos to conptr.
+    clc
+    lda video
+    adc temp    ; add TX*2
     sta video
+    lda video+1
+    adc #$F8
+    sta video+1
 
 ; prepare the pointers to the back-end field data, so we know what to display
     lda ZP_PTR_FIELD
@@ -1440,10 +1449,19 @@ outputfield2:
     lda ZP_PTR_FIELD+1
     sta ZP_PTR_1+1
 
+    stz fieldindex
 ; start displaying the selected field
-; temp2 contains a loop counter for the actual display rows
+; temp2 will a loop counter for the actual display rows
     lda #0
     sta temp2
+
+; we need the *2 of both field variables, to print the actual graphics on screen, which is twice as large in both dimensions
+    lda fieldwidth
+    asl
+    sta tempwidth
+    lda fieldheight
+    asl
+    sta tempheight
 
     ldx #0 ; 0 == top row of 16x16 tile, 10 == bottom row of 16x16 tile
 @nextrow:
@@ -1456,23 +1474,14 @@ outputfield2:
     jsr get_tilequarter
     sta (video),y
     iny
-    cpy fieldwidth
+    cpy tempwidth
     bne @col
 @checkrow:
+    inc temp2       ; increment display row counter
     lda temp2
-    clc
-    adc #1
-    sta temp2   ; increase display row counter
-    cmp fieldheight
+    cmp tempheight
     beq @done
-    ; xor x
-    cpx #0
-    beq @xto1 
-    ldx #0
-    bra @xordone
-@xto1:
-    ldx #1
-@xordone:
+    inx
     ; next row, add 40 to video
     lda video
     clc
@@ -1489,10 +1498,29 @@ outputfield2:
 get_tilequarter:
     ; inputs:
     ; x,y,Z_PTR_1
-    phx
-    phy
 
+    ; Inputs need mapping to temp as follows
+    ; X lowbit(Y) - temp index
+    ; 0        0 - #0
+    ; 0        1 - #1
+    ; 1        0 - #2
+    ; 1        1 - #3
+    tya
+    and #%00000001 ; leave only bit 0
+    sta tileindex  ; temp will be index 0-3, this is the low bit
+    txa
+    and #%00000001 ; leave only bit 0
+    beq @indexdone
+    lda tileindex
+    clc
+    adc #%00000010 ; add high bit
+    sta tileindex  ; now contains index into Tile ID from 0-3
+
+@indexdone:
+    phy ; about to destruct y
+    ldy fieldindex      ; load from current index into the fieldpointer
     lda (ZP_PTR_1),y    ; obtain content in field position
+    ply ; need to return y to caller
     cmp #'@'
     beq @player
     cmp #'+'
@@ -1529,30 +1557,46 @@ get_tilequarter:
     bra @tiled
 
 @tiled:
-    ; calculate offset in tile first
-    ; top-left:  y = 0, x = 0
-    ; top-right: y = 1, x = 0
-    ; btm-left:  y = 0, x = else (high bit)
-    ; btm-right: y = 1, x = else (high bit)
-    sty temp ; store low bit for later addition into A
-    txa
-    cmp #0
-    beq @hibitdone
-    ; x was <> 0, so make it 10
-    lda #10
-@hibitdone:
-    clc
-    adc temp    ; A now contains offset into tile originally pointed to by y. Range is 0 - 3 ($00 - $11)
-
-    ; tile 0: video characters 128,129,130,131. So 128 + 0-3
-    adc #FIRSTCHAR    ; character number 128 is top-left 8x8 of tile 0, add the 0-3 index to it previously calculated
-    sta temp
-    ply        ; return tile ID
-    tya
+    ; A contains tile ID now (Tile 0 - Tile 5)
     asl
-    asl        ; tile ID*4(8x8)
-    adc temp   ; A now contains the actual video character to display at this 8x8 quarter in the larger 16x16
-    plx
+    asl             ; Tile ID * 4
+    clc
+    adc tileindex   
+    adc #FIRSTCHAR  ; A is answer to the caller
+    ; now decide if we need to advance the fieldpointer
+    pha
+    ; is this the last time we used this tile on this particular row? (we display twice)
+    ; need to advance the tile after the last bit of y becomes 1
+    tya
+    and #%00000001
+    beq @done   ; screen-column in Y is even, so we're in the middle of the current tile. Nothing to advance.
+    ; advance pointer to next item
+    ; depends on ROW0/ROW1, which is represented by bit 0 in x register currently
+    ; first check if we are at the end of the field
+    inc fieldindex
+    lda fieldindex
+    cmp fieldwidth
+    bne @done   ; not at the end yet
+
+    ; Here we are at the end of the row
+    ; first reset fieldindex
+    stz fieldindex
+    ; then check bit 0 in x - ROW1 / ROW0
+    txa
+    and #%00000001 ; leave only bit 0
+    beq @done
+@ROW1advance:
+    ; add fieldwidth to the fieldpointer
+    lda ZP_PTR_1
+    clc
+    adc fieldwidth
+    sta ZP_PTR_1
+    bcc @done
+    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+    adc #0
+    sta ZP_PTR_1+1
+@done:
+    pla
     rts
 
 printfield:
@@ -1599,10 +1643,8 @@ printfield:
     clc
     adc fieldwidth
     sta ZP_PTR_1
-    bcc @checklastrow ; no carry, don't increment high byte on pointer
     lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
-    clc
-    adc #1
+    adc #0
     sta ZP_PTR_1+1
 @checklastrow:
     ; last row?
