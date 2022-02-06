@@ -1498,7 +1498,7 @@ printgraphics:
 get_tilequarter:
     ; inputs:
     ; x,y,Z_PTR_1
-
+    phy
     ; Inputs need mapping to temp as follows
     ; X lowbit(Y) - temp index
     ; 0        0 - #0
@@ -1517,14 +1517,10 @@ get_tilequarter:
     sta tileindex  ; now contains index into Tile ID from 0-3
 
 @indexdone:
-    phy ; about to destruct y
     ldy fieldindex      ; load from current index into the fieldpointer
     lda (ZP_PTR_1),y    ; obtain content in field position
     sta temp
-    ply ; need to return y to caller
 
-    ; NEW CODE
-    phy
     ldy #0
 @loop:
     lda translatefrom,y
@@ -1536,43 +1532,7 @@ get_tilequarter:
     bra @loop
 @found:
     lda translateto,y
-    ply
-;    cmp #'@'
-;    beq @player
-;    cmp #'+'
-;    beq @player
-;    cmp #'$'
-;    beq @crate
-;    cmp #'.'
-;    beq @goal
-;    cmp #'*'
-;    beq @crateongoal
-;    cmp #' '
-;    beq @ignore
-;    cmp #0
-;    beq @ignore
-;    bra @wall
-;
-;@player:
-;    lda #TILE_PLAYER
-;    bra @tiled
-;@crate:
-;    lda #TILE_CRATE
-;    bra @tiled
-;@goal:
-;    lda #TILE_GOAL
-;    bra @tiled
-;@crateongoal:
-;    lda #TILE_CRATE_ON_GOAL
-;    bra @tiled
-;@ignore:
-;    lda #TILE_IGNORE
-;    bra @tiled
-;@wall:
-;    lda #TILE_WALL
-;    bra @tiled
-;
-@tiled:
+
     ; A contains tile ID now (Tile 0 - Tile 5)
     asl
     asl             ; Tile ID * 4
@@ -1580,7 +1540,8 @@ get_tilequarter:
     adc tileindex   
     adc #FIRSTCHAR  ; A is answer to the caller
     ; now decide if we need to advance the fieldpointer
-    pha
+    ply ; need to retrieve Y from the caller, to determine position on the field
+    pha ; save result to the caller
     ; is this the last time we used this tile on this particular row? (we display twice)
     ; need to advance the tile after the last bit of y becomes 1
     tya
