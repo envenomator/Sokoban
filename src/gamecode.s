@@ -1540,11 +1540,10 @@ get_tilequarter:
     adc tileindex   
     adc #FIRSTCHAR  ; A is answer to the caller
     ; now decide if we need to advance the fieldpointer
-    ply ; need to retrieve Y from the caller, to determine position on the field
     pha ; save result to the caller
     ; is this the last time we used this tile on this particular row? (we display twice)
     ; need to advance the tile after the last bit of y becomes 1
-    tya
+    lda tileindex
     and #%00000001
     beq @done   ; screen-column in Y is even, so we're in the middle of the current tile. Nothing to advance.
     ; advance pointer to next item
@@ -1574,6 +1573,7 @@ get_tilequarter:
     sta ZP_PTR_1+1
 @done:
     pla
+    ply
     rts
 
 printfield:
