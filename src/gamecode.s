@@ -1520,42 +1520,58 @@ get_tilequarter:
     phy ; about to destruct y
     ldy fieldindex      ; load from current index into the fieldpointer
     lda (ZP_PTR_1),y    ; obtain content in field position
+    sta temp
     ply ; need to return y to caller
-    cmp #'@'
-    beq @player
-    cmp #'+'
-    beq @player
-    cmp #'$'
-    beq @crate
-    cmp #'.'
-    beq @goal
-    cmp #'*'
-    beq @crateongoal
-    cmp #' '
-    beq @ignore
+
+    ; NEW CODE
+    phy
+    ldy #0
+@loop:
+    lda translatefrom,y
+    cmp temp    ; field content matching lookup table? 
+    beq @found
     cmp #0
-    beq @ignore
-    bra @wall
-
-@player:
-    lda #TILE_PLAYER
-    bra @tiled
-@crate:
-    lda #TILE_CRATE
-    bra @tiled
-@goal:
-    lda #TILE_GOAL
-    bra @tiled
-@crateongoal:
-    lda #TILE_CRATE_ON_GOAL
-    bra @tiled
-@ignore:
-    lda #TILE_IGNORE
-    bra @tiled
-@wall:
-    lda #TILE_WALL
-    bra @tiled
-
+    beq @found  ; terminate at end-of-table
+    iny
+    bra @loop
+@found:
+    lda translateto,y
+    ply
+;    cmp #'@'
+;    beq @player
+;    cmp #'+'
+;    beq @player
+;    cmp #'$'
+;    beq @crate
+;    cmp #'.'
+;    beq @goal
+;    cmp #'*'
+;    beq @crateongoal
+;    cmp #' '
+;    beq @ignore
+;    cmp #0
+;    beq @ignore
+;    bra @wall
+;
+;@player:
+;    lda #TILE_PLAYER
+;    bra @tiled
+;@crate:
+;    lda #TILE_CRATE
+;    bra @tiled
+;@goal:
+;    lda #TILE_GOAL
+;    bra @tiled
+;@crateongoal:
+;    lda #TILE_CRATE_ON_GOAL
+;    bra @tiled
+;@ignore:
+;    lda #TILE_IGNORE
+;    bra @tiled
+;@wall:
+;    lda #TILE_WALL
+;    bra @tiled
+;
 @tiled:
     ; A contains tile ID now (Tile 0 - Tile 5)
     asl
@@ -1865,6 +1881,7 @@ completescreen:
 ; tile data
 ; each tile consists of 16x16, 4x8x8 laid out sequentially
 ; this will need to be loaded dynamically into character memory at program start
+    .data
 tiledata:
 player:
     .byte $1,$3,$4,$A,$8,$5,$4,$3,$80,$C0,$20,$50,$10,$A0,$20,$C0,$6,$F,$E,$1B,$3,$2,$6,$E,$60,$F0,$70,$D8,$C0,$40,$60,$70
@@ -1878,6 +1895,10 @@ brick:
     .byte $EF,$AA,$EF,$0,$FE,$AA,$FE,$0,$EF,$AA,$EF,$0,$FE,$AA,$FE,$0,$EF,$AA,$EF,$0,$FE,$AA,$FE,$0,$EF,$AA,$EF,$0,$FE,$AA,$FE,$0
 black:
     .byte $0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0
+translatefrom:
+    .byte '@','+','$','.','*','#',' ',0
+translateto:
+    .byte TILE_PLAYER,TILE_PLAYER,TILE_CRATE,TILE_GOAL,TILE_CRATE_ON_GOAL,TILE_WALL,TILE_IGNORE,TILE_IGNORE
 LOADSTART:
 .incbin "levels.bin"
 RAMBANK:    ; Start of variable DATA, used for copying new field into
