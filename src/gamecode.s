@@ -83,59 +83,9 @@ start:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
     txs       ; init stack pointer (X => SP)
-
+    jsr con_init
     jsr resetvars
     jsr loadtiledata
-
-    ; DEBUG CODE
-   ; show player top-left
-    ;lda #128
-    ;sta $F800
-    ;lda #129
-    ;sta $F801
-    ;lda #130
-    ;sta $F828
-    ;lda #131
-    ;sta $F829
-    ;lda #132
-    ;sta $F802
-    ;lda #133
-    ;sta $F803
-    ;lda #134
-    ;sta $F82a
-    ;lda #135
-    ;sta $F82b
-    ;lda #136
-    ;sta $F804
-    ;lda #137
-    ;sta $F805
-    ;lda #138
-    ;sta $F82c
-    ;lda #139
-    ;sta $F82d
-    ;lda #140
-    ;sta $F806
-    ;lda #141
-    ;sta $F807
-    ;lda #142
-    ;sta $F82e
-    ;lda #143
-    ;sta $F82f
-    ;lda #144
-    ;sta $F808
-    ;lda #145
-    ;sta $F809
-    ;lda #146
-    ;sta $F830
-    ;lda #147
-    ;sta $F831
-;
-;@loop:
-;    bra @loop
-
-    ; END DEBUG CODE
-
-    jsr con_init
     
     lda #$1
     sta currentlevel    ; start with level 1
@@ -146,6 +96,15 @@ start:
     ;rts                 ; pressed 'q'
 @continue:
     jsr initfield       ; load correct startup values for selected field
+
+    ; start DEBUG
+    jsr printpreview
+
+@infinite:
+    jmp @infinite
+
+    ; end DEBUG
+
     jsr printgraphics
 
 keyloop:
@@ -1641,6 +1600,90 @@ printfield:
 
     rts
 
+printpreview:
+    ; console routines only
+    ; depends only on
+    ; - field label for start of field
+    ; prints on bottom-left part of the screen
+    ; calling routine needs to clear the screen
+    ; con_init needs to be performed previously
+
+    lda ZP_PTR_FIELD
+    sta ZP_PTR_1
+    lda ZP_PTR_FIELD+1
+    sta ZP_PTR_1+1
+
+    ; find start y position in the middle of lower part of the screen
+    lda #(SCREENHEIGHT/2)   ; the maximum space we have vertically
+    sec
+    sbc fieldheight
+    lsr ; divide by two
+    clc
+    adc #(SCREENHEIGHT/2)   ; at starting point
+    tay ; y position
+
+    ; find start x position
+    lda #(SCREENWIDTH/2)
+    sec
+    sbc fieldwidth
+    lsr ; divide by two
+    clc
+    adc #(SCREENWIDTH/2)
+    sta temp2
+    tax ; x position
+    ; position in the middle of the screen for top-left mini-field
+    jsr con_gotoxy
+
+    ldx #0 ; row counter
+@nextrow:
+    ldy #0 ; column counter
+@row:
+    lda (ZP_PTR_1),y        ; load character from field
+    phy     ; save volumn counter
+    sta temp                ; save for comparison, limited 6502
+
+    ; find character in map
+    ldy #0
+@loop:
+    lda translatefrom,y
+    cmp temp    ; field content matching lookup table? 
+    beq @found
+    cmp #0
+    beq @found  ; terminate at end-of-table
+    iny
+    bra @loop
+@found:
+    lda translatepreview,y
+    ply     ; retrieve column counter again
+
+    jsr con_printchar
+
+    iny
+    cpy fieldwidth
+    bne @row
+
+    phx
+    lda #$0d
+    jsr con_printchar
+    ldx temp2
+    jsr con_gotox
+    plx
+
+    ; advance pointer to next row
+    lda ZP_PTR_1
+    clc
+    adc fieldwidth
+    sta ZP_PTR_1
+    lda ZP_PTR_1+1 ; carry to high byte if carry set ;-)
+    adc #0
+    sta ZP_PTR_1+1
+@checklastrow:
+    ; last row?
+    inx
+    cpx fieldheight
+    bne @nextrow
+    rts
+
 con_init:
     ; initializes the console variables
     ; reset to X,Y = 0,0
@@ -1860,6 +1903,8 @@ translatefrom:
     .byte '@','+','$','.','*','#',' ',0
 translateto:
     .byte TILE_PLAYER,TILE_PLAYER,TILE_CRATE,TILE_GOAL,TILE_CRATE_ON_GOAL,TILE_WALL,TILE_IGNORE,TILE_IGNORE
+translatepreview:
+    .byte 0,0,'#','X','*',8,' ',' '
 LOADSTART:
 .incbin "levels.bin"
 RAMBANK:    ; Start of variable DATA, used for copying new field into
