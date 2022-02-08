@@ -1135,92 +1135,6 @@ initfield:
     sta ZP_PTR_FIELD+1
     rts
 
-displaymessagescreen:
-    ; temp store pointer to the requested text
-    lda ZP_PTR_1
-    pha
-    lda ZP_PTR_1+1
-    pha
-
-    lda #<messagescreen
-    sta ZP_PTR_1
-    lda #>messagescreen
-    sta ZP_PTR_1+1
-    jsr displaytileset
-    ; now display the string at ZP_PTR_1 in the middle and return
-    pla
-    sta ZP_PTR_1+1
-    pla
-    sta ZP_PTR_1
-;    stz VERA_CTRL
-    ;lda #%00100000
-    lda #$10
-;    sta VERA_HIGH
-    lda #28
-;    sta VERA_MID
-    lda #28*2
-;    sta VERA_LOW
-    ldx #$9 ; color brown
-    jsr printverastring
-    rts
-
-printverastring:
-    ; ZP_PTR_1 is pointing to the string
-    ; x contains color of the text
-    ldy #0
-@loop:
-    lda (ZP_PTR_1),y
-    beq @end
-    cmp #$40    
-    bcc @output
-@AZ:
-    sec
-    sbc #$40
-@output:
-;    sta VERA_DATA0
-;    stx VERA_DATA0
-    iny
-    bra @loop
-@end:
-    rts
-
-displaytileset:
-; Fill the Layer 0 with the tileset pointed to by ZP_PTR_1
-;    stz VERA_CTRL                       ; Use Data Register 0
-    lda #$10
-;    sta VERA_HIGH                       ; Set Increment to 1, High Byte to 0
-    lda #$40
-;    sta VERA_MID                        ; Set Middle Byte to $40
-    lda #$0
-;    sta VERA_LOW                        ; Set Low Byte to $00
-
-    ldy #32
-@outerloop:
-    ldx #64
-@innerloop:
-    phy
-    ldy #0
-    lda (ZP_PTR_1),y                    ; load byte from tileset
-;    sta VERA_DATA0
-;    stz VERA_DATA0                      ; zero it's attribute
-    ply
-
-    ; increase pointer to next byte in the set
-    lda ZP_PTR_1
-    clc
-    adc #$2
-    sta ZP_PTR_1
-    lda ZP_PTR_1+1
-    adc #$0
-    sta ZP_PTR_1+1
-
-    dex
-    bne @innerloop
-    dey
-    bne @outerloop
-
-    rts
-
 displaytitlescreen:
     ldx #7
     ldy #5
@@ -1286,7 +1200,6 @@ displaytitlescreen:
     jsr con_print
 
     rts
-
 
 loadtiledata:
     ; loads tile data into character memory, starting from FIRSTCHAR
