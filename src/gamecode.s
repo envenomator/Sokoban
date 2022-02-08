@@ -13,11 +13,6 @@ KEY_DOWN            = $0A
 KEY_LEFT            = $08
 KEY_RIGHT           = $15
 KEY_ENTER           = $0D
-KEY_Q               = $51
-KEY_R               = $52
-KEY_M               = $4D
-KEY_N               = $4E
-KEY_U               = $55
 TILE_PLAYER         = 0   ; start video character, top-left position of each tile
 TILE_CRATE          = 1
 TILE_GOAL           = 2
@@ -49,22 +44,23 @@ fieldindex:     .res 1  ; used for column-indexing the fieldpointer
 .setcpu "65C02"
 .segment "CODE"
 
-   jmp start
+   jmp init
 
 ; strings 
-quitaskmessage:   .byte "really quit? y/n",0
-selectmessage:    .byte "select a level (1-",0
-selectendmessage: .byte "): ",0
-clear:            .byte "                                        ",0
-resetmessage:     .byte "really reset level? y/n",0
+selectmessage:    .byte "ENTER to select level: ",0
+clear:            .byte "                           ",0
+resetmessage:     .byte "really RESET level? y/n",0
+quitaskmessage:   .byte "really QUIT? y/n",0
+congratmessage:   .byte "Level complete - press ENTER",0
 quitmessage:      .byte "press q to quit",0
 winstatement:     .byte "level complete! new level? y/n",0
-help0:            .byte "(c)2022 venom",0
-help1:            .byte "keyboard shortcuts:",0
-help2:            .byte "cursor - moves player",0
-help3:            .byte "     q - quit",0
-help4:            .byte "     u - undo move(s)",0
-help5:            .byte "     r - reset level",0
+title:            .byte "Sokoban for cerberus 2080",0
+copyright:        .byte "(c)2022 Venom",0
+help1:            .byte "keyboard shortcuts",0
+help2:            .byte "cursor:move player",0
+help3:            .byte "     q:quit",0
+help4:            .byte "     u:undo move",0
+help5:            .byte "     r:reset level",0
 done0:            .byte "m(enu)",0
 done1:            .byte "n(ext)",0
 done2:            .byte "q(uit)",0
@@ -79,32 +75,24 @@ undostack:        .byte 0,0,0,0,0,0,0,0,0,0
 undoindex:        .byte 0
 undocounter:      .byte 0
 
-start:
+init:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
     txs       ; init stack pointer (X => SP)
+
+    lda #1
+    sta currentlevel    ; game starts at level 1
+start:
     jsr con_init
+    jsr con_cls
     jsr resetvars
     jsr loadtiledata
-    
-    lda #$1
-    sta currentlevel    ; start with level 1
-
-    ;jsr displaytitlescreen
-    ;jsr selectlevel
-    ;bcc @continue
-    ;rts                 ; pressed 'q'
+    jsr displaytitlescreen
+    jsr selectlevel
+    bcc @continue
+    ;jmp exit                 ; pressed 'q' ; ignore for now
 @continue:
-    jsr initfield       ; load correct startup values for selected field
-
-    ; start DEBUG
-    jsr printpreview
-
-@infinite:
-    jmp @infinite
-
-    ; end DEBUG
-
+    jsr con_cls
     jsr printgraphics
 
 keyloop:
@@ -130,70 +118,168 @@ keyloop:
     jsr handleright
     bra @done
 @checkundo:
-    cmp #KEY_U
+    cmp #'u'
     beq @handle_undo
-    cmp #(KEY_U | $20) ; lower case
+    cmp #'U'
     bne @checkreset
 @handle_undo:
     jsr handle_undocommand
     bra @done
 @checkreset:
-    cmp #KEY_R
+    cmp #'r'
     beq @handle_reset
-    cmp #(KEY_R | $20) ; lower case
+    cmp #'R'
     bne @checkquit
 @handle_reset:
     jsr askreset
     bcs @resetgame
+    jsr con_cls
     jsr printgraphics
     bra @done
 @resetgame:
     jsr resetvars
     jsr initfield
+    jsr con_cls
     jsr printgraphics
     bra keyloop
 @checkquit:
-    cmp #KEY_Q
+    cmp #'q'
     beq @handle_quit
-    cmp #(KEY_Q | $20) ; lower case
+    cmp #'Q'
     bne @done
 @handle_quit:
     jsr askquit
     bcs @exit
+    jsr con_cls
     jsr printgraphics
     bra @done
 @exit:
-    rts
+    jmp start
 @done:
     ; check if we have reached all goals
     lda no_goals
     cmp no_goalsreached
     bne @donenextkey
-    jsr asknewlevel
-    cmp #KEY_M ; Menu
-    beq @gotomenu   ; reset game / let user decide on new level
-    cmp #(KEY_M | $20) ; Menu
-    beq @gotomenu
-    cmp #KEY_Q ; Quit
-    beq @quit
-    cmp #(KEY_Q | $20) ; Quit
-    beq @quit
-    bra @nextgame
-@gotomenu:
-    jmp start
-@nextgame:
+    jsr congratulations
     ; check if this was the last level
     lda no_levels
     cmp currentlevel
-    beq @gotomenu   ; select another game
+    bne @nextlevel
+    lda #1              ; max level reached, reset to 1
+    sta currentlevel
+    bra @prepnextgame
+@nextlevel:
     inc currentlevel ; next level
-    jsr resetvars
-
-    jsr initfield       ; load correct startup values for selected field
-    jsr printgraphics
+@prepnextgame:
+    jmp start
 @donenextkey:
     jmp keyloop
 @quit:
+    jmp start
+
+exit:
+    lda #$7F    ; BIOS request to reset
+    sta $202    ; INBOX_FLAG
+@loop:
+    jmp @loop
+
+printcenteredmesssage:
+    ; prints a centered yes/no style of message, single line
+    ; given as strptr
+    ; first calculate message length
+    ; length can be maximum of #SCREENWIDTH-2, will not be checked, code is too static for this
+    phx
+    phy
+
+    ldy #0
+@loop:
+    lda (strptr),y
+    iny
+    cmp #0
+    bne @loop   ; at the end of the loop, y contains number of characters in string
+    sty temp
+    lda #SCREENWIDTH
+    sec
+    sbc temp
+    lsr         ; divide by two
+    sta temp2
+    dec temp2   ; start one early for space
+    ; temp == length of string
+    ; temp2 == start of string on screen
+
+    ; prep line1
+    ldx temp2
+    ldy #13
+    jsr con_gotoxy
+    inc temp
+    inc temp
+    ; line 1: all spaces 
+    ldy #0
+    lda #' '
+@line1:
+    jsr con_printchar
+    iny
+    cpy temp
+    bne @line1
+
+    ; prep line2
+    ldx temp2
+    ldy #14
+    jsr con_gotoxy
+    lda #' '
+    jsr con_printchar
+    jsr con_print   ; print out actual string
+    lda #' '
+    jsr con_printchar   ; end with space
+
+    ; prep line3
+    ldx temp2
+    ldy #15
+    jsr con_gotoxy
+    ldy #0
+    lda #' '
+@line3:
+    jsr con_printchar
+    iny
+    cpy temp
+    bne @line3
+
+    ply
+    plx
+
+    rts
+
+yesnomessage:
+    ; wait for y/n
+    jsr printcenteredmesssage
+
+    clc
+@keyloop:
+    jsr GETIN
+@checkyes:
+    cmp #'y'
+    bne @checkno
+    sec
+    bra @done
+    rts
+@checkno:
+    cmp #'n'
+    bne @keyloop
+    clc
+@done:
+    rts
+
+waitforentermessage:
+    ; wait for ENTER
+    jsr printcenteredmesssage
+
+    clc
+@keyloop:
+    jsr GETIN
+@checkenter:
+    cmp #KEY_ENTER
+    bne @checkenter
+@done:
     rts
 
 GETIN:
@@ -237,108 +323,31 @@ handle_undocommand:
     ; do nothing
     rts
 
-asknewlevel:
-    ; display level complete tilesetj
-;    lda #<completescreen
-;    sta ZP_PTR_1
-;    lda #>completescreen
-;    sta ZP_PTR_1+1
-;    jsr displaytileset
-;
-;    stz VERA_CTRL
-;    ldx #$9 ; color brown
-;    lda #$10
-;    sta VERA_HIGH
-;
-;    lda #<done0
-;    sta ZP_PTR_1
-;    lda #>done0
-;    sta ZP_PTR_1+1
-;    lda #37
-;    sta VERA_MID
-;    lda #38*2
-;    sta VERA_LOW
-;    jsr printverastring
-;
-;    lda #<done1
-;    sta ZP_PTR_1
-;    lda #>done1
-;    sta ZP_PTR_1+1
-;    lda #41
-;    sta VERA_MID
-;    lda #38*2
-;    sta VERA_LOW
-;    jsr printverastring
-;
-;    lda #<done2
-;    sta ZP_PTR_1
-;    lda #>done2
-;    sta ZP_PTR_1+1
-;    lda #45
-;    sta VERA_MID
-;    lda #38*2
-;    sta VERA_LOW
-;    jsr printverastring
-
-@keyloop:
-    jsr GETIN
-    ; these lines will filter for 'M / m / N / n / Q / q'
-    cmp #KEY_M ; M (enu)
-    beq @done
-    cmp #(KEY_M | $20); lower case
-    beq @done
-    cmp #$4E ; N (ext)
-    beq @done
-    cmp #(KEY_N | $20) ; lower case
-    beq @done
-    cmp #KEY_Q ; Q (uit)
-    beq @done
-    cmp #(KEY_Q | $20) ; lower case
-    beq @done
-    bra @keyloop
-@done:
+congratulations:
+    lda #<congratmessage
+    sta strptr
+    lda #>congratmessage
+    sta strptr+1
+    jsr waitforentermessage
     rts
 
 askquit:
     ; ask if the user would like to quit, and return carry on 'y'
     lda #<quitaskmessage
-    sta ZP_PTR_1
+    sta strptr
     lda #>quitaskmessage
-    sta ZP_PTR_1+1
-    jsr displaymessagescreen
-
-@keyloop:
-    jsr GETIN
-@checkyes:
-    cmp #$59 ; Y
-    bne @checkno
-    sec
-    rts
-@checkno:
-    cmp #$4e ; N
-    bne @keyloop
-    clc
+    sta strptr+1
+    jsr yesnomessage
     rts
 
 askreset:
     ; ask if the user would like to reset, and return carry on 'y'
     lda #<resetmessage
-    sta ZP_PTR_1
+    sta strptr
     lda #>resetmessage
-    sta ZP_PTR_1+1
-    jsr displaymessagescreen
-
-@keyloop:
-    jsr GETIN
-@checkyes:
-    cmp #$59 ; Y
-    bne @checkno
-    sec
-    rts
-@checkno:
-    cmp #$4e ; N
-    bne @keyloop
-    clc
+    sta strptr+1
+    
+    jsr yesnomessage
     rts
 
 handleright:
@@ -848,10 +857,8 @@ moveplayeronfield:
     
 printdecimal:
     ; prints decimal from A register
-    ; VERA control needs to be set up previously
     phx
     phy
-    stx temp    ; keep color to print in
     ldy #$2f
     ldx #$3a
     sec
@@ -872,55 +879,45 @@ printdecimal:
     tya
     cmp #$30 ; is it a '0' petscii?
     beq @tens
-;    sta VERA_DATA0
-;    lda temp
-;    sta VERA_DATA0
+    jsr con_printchar
 @tens:
     pla
     cmp #$30 ; is it a '0' petscii?
     beq @ones
-;    sta VERA_DATA0
-;    lda temp
-;    sta VERA_DATA0
+    jsr con_printchar
 @ones:
     pla
-;    sta VERA_DATA0
-;    lda temp
-;    sta VERA_DATA0
+    jsr con_printchar
 
     ply
     plx
     rts
 
 selectlevel:
-    lda #1 ; start out with first level
-    sta currentlevel
+    ; initial level needs to have been set.
 
 @mainloop:
-    jsr clearselect
-    ; text prep to VERA
-;    stz VERA_CTRL
-;    ldx #$9 ; color brown
-;    lda #$10
-;    sta VERA_HIGH
-;    lda #<selectmessage
-;    sta ZP_PTR_1
-;    lda #>selectmessage
-;    sta ZP_PTR_1+1
-;    lda #45
-;    sta VERA_MID
-;    lda #10*2
-;    sta VERA_LOW
-;    jsr printverastring
+    jsr initfield   ; select field for chosen level
+    jsr printpreview
 
-    ; print range
-    lda no_levels
-    jsr printdecimal
-    lda #<selectendmessage
-    sta ZP_PTR_1
-    lda #>selectendmessage
-    sta ZP_PTR_1+1
-    jsr printverastring
+    ldx #11
+    ldy #13
+    jsr con_gotoxy
+    lda #<clear
+    sta strptr
+    lda #>clear
+    sta strptr+1
+    jsr con_print
+
+    ldx #11
+    ldy #13
+    jsr con_gotoxy
+    lda #<selectmessage
+    sta strptr
+    lda #>selectmessage
+    sta strptr+1
+    jsr con_print
+
     ; print level number
     lda currentlevel
     jsr printdecimal
@@ -928,9 +925,9 @@ selectlevel:
 @charloop:
     jsr GETIN
 @checkdown:
-    cmp #$11 ; down pressed
+    cmp #KEY_DOWN
     beq @down
-    cmp #$9d ; left pressed
+    cmp #KEY_LEFT
     beq @down
     bra @checkup
 @down:
@@ -941,9 +938,9 @@ selectlevel:
     dec currentlevel
     bra @mainloop
 @checkup:
-    cmp #$91 ; up pressed
+    cmp #KEY_UP
     beq @up
-    cmp #$1d ; right pressed
+    cmp #KEY_RIGHT
     beq @up
     bra @checkreturnkey
 @up:
@@ -954,15 +951,17 @@ selectlevel:
     inc currentlevel
     bra @mainloop
 @checkreturnkey:
-    cmp #$0d
+    cmp #KEY_ENTER
     bne @checkquit
     ; return key pressed - select this level
+    clc
     rts
 @checkquit:
-    cmp #$51
+    cmp #'q'
     bne @charloop
     sec ; set carry to notify caller
     rts
+
 resetvars:
     ; reset goals
     lda #0
@@ -988,23 +987,6 @@ resetvars:
 
     stz undoindex
     stz undocounter
-    rts
-
-clearselect:
-    ; clear out select text first
-;    stz VERA_CTRL
-    ldx #$9
-    lda #$10
-;    sta VERA_HIGH
-    lda #<clear
-    sta ZP_PTR_1
-    lda #>clear
-    sta ZP_PTR_1+1
-    lda #45
-;    sta VERA_MID
-    lda #10*2
-;    sta VERA_LOW
-    jsr printverastring
     rts
 
 initfield:
@@ -1240,76 +1222,69 @@ displaytileset:
     rts
 
 displaytitlescreen:
-    lda #<titlescreen
-    sta ZP_PTR_1
-    lda #>titlescreen
-    sta ZP_PTR_1+1
-    jsr displaytileset
+    ldx #7
+    ldy #5
+    jsr con_gotoxy
+    lda #<title
+    sta strptr
+    lda #>title
+    sta strptr+1
+    jsr con_print
 
-;    stz VERA_CTRL
-    ldx #$9 ; color brown
-    lda #$10
-;    sta VERA_HIGH
+    ldx #19
+    ldy #7
+    jsr con_gotoxy
+    lda #<copyright
+    sta strptr
+    lda #>copyright
+    sta strptr+1
+    jsr con_print
 
-    lda #<help0
-    sta ZP_PTR_1
-    lda #>help0
-    sta ZP_PTR_1+1
-    lda #23
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
-
+    ldx #0
+    ldy #19
+    jsr con_gotoxy
     lda #<help1
-    sta ZP_PTR_1
+    sta strptr
     lda #>help1
-    sta ZP_PTR_1+1
-    lda #30
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
+    sta strptr+1
+    jsr con_print
 
+    ldx #0
+    ldy #21
+    jsr con_gotoxy
     lda #<help2
-    sta ZP_PTR_1
+    sta strptr
     lda #>help2
-    sta ZP_PTR_1+1
-    lda #32
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
+    sta strptr+1
+    jsr con_print
 
+    ldx #0
+    ldy #22
+    jsr con_gotoxy
     lda #<help3
-    sta ZP_PTR_1
+    sta strptr
     lda #>help3
-    sta ZP_PTR_1+1
-    lda #33
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
+    sta strptr+1
+    jsr con_print
 
+    ldx #0
+    ldy #23
+    jsr con_gotoxy
     lda #<help4
-    sta ZP_PTR_1
+    sta strptr
     lda #>help4
-    sta ZP_PTR_1+1
-    lda #34
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
+    sta strptr+1
+    jsr con_print
 
+    ldx #0
+    ldy #24
+    jsr con_gotoxy
     lda #<help5
-    sta ZP_PTR_1
+    sta strptr
     lda #>help5
-    sta ZP_PTR_1+1
-    lda #35
-;    sta VERA_MID
-    lda #50*2
-;    sta VERA_LOW
-    jsr printverastring
+    sta strptr+1
+    jsr con_print
+
     rts
 
 
@@ -1608,6 +1583,22 @@ printpreview:
     ; calling routine needs to clear the screen
     ; con_init needs to be performed previously
 
+    ; clear area first
+    ldy #(SCREENHEIGHT/2)
+    lda #' '
+@clsloop:
+    ldx #(SCREENWIDTH/2)
+    jsr con_gotoxy
+@rowloop:
+    jsr con_printchar
+    inx
+    cpx #SCREENWIDTH
+    bne @rowloop
+    iny
+    cpy #SCREENHEIGHT
+    bne @clsloop
+
+    ; point ZP_PTR_1 to the field
     lda ZP_PTR_FIELD
     sta ZP_PTR_1
     lda ZP_PTR_FIELD+1
