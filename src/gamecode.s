@@ -4,16 +4,16 @@ LEVELHEADER         = 12
 MAXUNDO             = 10
 WIDTH_IN_TILES      = 20        ; screen width/height in 16x16 tiles
 HEIGHT_IN_TILES     = 15
-SCREENWIDTH         = 40       ; actual screenwidth
-SCREENHEIGHT        = 30       ; actual screenheight
-VIDSTART            = $F800    ; top-left memory address in Cerberus 2080
-FIRSTCHAR           = 128      ; first custom character to be part of a tileset
+SCREENWIDTH         = 40        ; actual screenwidth
+SCREENHEIGHT        = 30        ; actual screenheight
+VIDSTART            = $F800     ; top-left memory address in Cerberus 2080
+FIRSTCHAR           = 128       ; first custom character to be part of a tileset
 KEY_UP              = $0B
 KEY_DOWN            = $0A
 KEY_LEFT            = $08
 KEY_RIGHT           = $15
 KEY_ENTER           = $0D
-TILE_PLAYER         = 0   ; start video character, top-left position of each tile
+TILE_PLAYER         = 0         
 TILE_CRATE          = 1
 TILE_GOAL           = 2
 TILE_CRATE_ON_GOAL  = 3
@@ -21,13 +21,10 @@ TILE_WALL           = 4
 TILE_IGNORE         = 5
 
     .zeropage
-    .exportzp ZP_PTR_1
-    .exportzp video
-
 xpos:           .res 1
 ypos:           .res 1
 conptr:         .res 2
-strptr:         .res 2 ; for program use
+strptr:         .res 2  ; used for con_print routine. Load zero-terminated string to strptr/strptr+1 and call routine
 ZP_PTR_1:       .res 2
 ZP_PTR_2:       .res 2
 ZP_PTR_3:       .res 2  ; position of player
@@ -42,10 +39,10 @@ tileindex:      .res 1  ; used during calculation of presention tile quarter 0-3
 fieldindex:     .res 1  ; used for column-indexing the fieldpointer
 
 .setcpu "65C02"
-.segment "CODE"
+    .code
+    jmp init
 
-   jmp init
-
+    .data
 ; strings 
 selectmessage:    .byte "ENTER to select level: ",0
 clear:            .byte "                           ",0
@@ -53,17 +50,13 @@ resetmessage:     .byte "really RESET level? y/n",0
 quitaskmessage:   .byte "really QUIT? y/n",0
 congratmessage:   .byte "Level complete - press ENTER",0
 quitmessage:      .byte "press q to quit",0
-winstatement:     .byte "level complete! new level? y/n",0
 title:            .byte "Sokoban for cerberus 2080",0
 copyright:        .byte "(c)2022 Venom",0
-help1:            .byte "keyboard shortcuts",0
+help1:            .byte "game controls:",0
 help2:            .byte "cursor:move player",0
 help3:            .byte "     q:quit",0
 help4:            .byte "     u:undo move",0
 help5:            .byte "     r:reset level",0
-done0:            .byte "m(enu)",0
-done1:            .byte "n(ext)",0
-done2:            .byte "q(uit)",0
 ; variables that the program uses during execution
 currentlevel:     .byte 0 ; will need to be filled somewhere in the future in the GUI, or asked from the user
 no_levels:        .byte 0 ; will be read by initfield
@@ -75,11 +68,11 @@ undostack:        .byte 0,0,0,0,0,0,0,0,0,0
 undoindex:        .byte 0
 undocounter:      .byte 0
 
+    .code
 init:
     ; Init stack
     ldx #$ff  ; start stack at $1ff
     txs       ; init stack pointer (X => SP)
-
     lda #1
     sta currentlevel    ; game starts at level 1
 start:
@@ -89,73 +82,64 @@ start:
     jsr loadtiledata
     jsr displaytitlescreen
     jsr selectlevel
-    bcc @continue
-    ;jmp exit                 ; pressed 'q' ; ignore for now
-@continue:
     jsr con_cls
     jsr printgraphics
 
 keyloop:
     jsr GETIN
-@checkdown:
-    cmp #KEY_DOWN
-    bne @checkup
-    jsr handledown
-    bra @done
-@checkup:
-    cmp #KEY_UP
-    bne @checkleft
+    sta temp
+    ldy #0
+@keymatch:
+    lda ingame_keyinput,y
+    cmp temp
+    beq @keyfound
+    cmp #0
+    beq @keyfound
+    iny
+    bra @keymatch 
+@keyfound:
+    tya
+    asl ; *2 for word index
+    tax
+    jmp (ingame_keyjump,x)
+    ; will never get here
+
+handle_ingamekeyup:
     jsr handleup
-    bra @done
-@checkleft:
-    cmp #KEY_LEFT
-    bne @checkright
+    jmp checkdone
+handle_ingamekeydown:
+    jsr handledown
+    jmp checkdone
+handle_ingamekeyleft:
     jsr handleleft
-    bra @done
-@checkright:
-    cmp #KEY_RIGHT
-    bne @checkundo
+    jmp checkdone
+handle_ingamekeyright:
     jsr handleright
-    bra @done
-@checkundo:
-    cmp #'u'
-    beq @handle_undo
-    cmp #'U'
-    bne @checkreset
-@handle_undo:
+    jmp checkdone
+handle_ingamekeyundo:
     jsr handle_undocommand
-    bra @done
-@checkreset:
-    cmp #'r'
-    beq @handle_reset
-    cmp #'R'
-    bne @checkquit
-@handle_reset:
+    jmp checkdone
+handle_ingamekeyreset:
     jsr askreset
     bcs @resetgame
     jsr con_cls
     jsr printgraphics
-    bra @done
+    jmp checkdone
 @resetgame:
     jsr resetvars
     jsr initfield
     jsr con_cls
     jsr printgraphics
-    bra keyloop
-@checkquit:
-    cmp #'q'
-    beq @handle_quit
-    cmp #'Q'
-    bne @done
-@handle_quit:
+    jmp keyloop
+handle_ingamekeyquit:
     jsr askquit
     bcs @exit
     jsr con_cls
     jsr printgraphics
-    bra @done
+    jmp checkdone
 @exit:
     jmp start
-@done:
+checkdone:
     ; check if we have reached all goals
     lda no_goals
     cmp no_goalsreached
@@ -174,10 +158,10 @@ keyloop:
     jmp start
 @donenextkey:
     jmp keyloop
-@quit:
-    jmp start
 
 exit:
+    ; does not seem to work with standard bios, with defaults to starting at vector 0 for Z80
+    ; stub routine for now, not called in code
     lda #$7F    ; BIOS request to reset
     sta $202    ; INBOX_FLAG
 @loop:
@@ -206,7 +190,6 @@ printcenteredmesssage:
     dec temp2   ; start one early for space
     ; temp == length of string
     ; temp2 == start of string on screen
-
     ; prep line1
     ldx temp2
     ldy #13
@@ -221,7 +204,6 @@ printcenteredmesssage:
     iny
     cpy temp
     bne @line1
-
     ; prep line2
     ldx temp2
     ldy #14
@@ -231,7 +213,6 @@ printcenteredmesssage:
     jsr con_print   ; print out actual string
     lda #' '
     jsr con_printchar   ; end with space
-
     ; prep line3
     ldx temp2
     ldy #15
@@ -243,16 +224,13 @@ printcenteredmesssage:
     iny
     cpy temp
     bne @line3
-
     ply
     plx
-
     rts
 
 yesnomessage:
     ; wait for y/n
     jsr printcenteredmesssage
-
     clc
 @keyloop:
     jsr GETIN
@@ -272,7 +250,6 @@ yesnomessage:
 waitforentermessage:
     ; wait for ENTER
     jsr printcenteredmesssage
-
     clc
 @keyloop:
     jsr GETIN
@@ -346,7 +323,6 @@ askreset:
     sta strptr
     lda #>resetmessage
     sta strptr+1
-    
     jsr yesnomessage
     rts
 
@@ -896,7 +872,6 @@ printdecimal:
 selectlevel:
     ; initial level needs to have been set.
 
-@mainloop:
     jsr initfield   ; select field for chosen level
     jsr printpreview
 
@@ -922,44 +897,39 @@ selectlevel:
     lda currentlevel
     jsr printdecimal
 
-@charloop:
+selectlevel_charloop:
     jsr GETIN
-@checkdown:
-    cmp #KEY_DOWN
-    beq @down
-    cmp #KEY_LEFT
-    beq @down
-    bra @checkup
-@down:
-    ; down key pressed
-    lda currentlevel
-    cmp #1
-    beq @charloop   ; lowest value == 1
-    dec currentlevel
-    bra @mainloop
-@checkup:
-    cmp #KEY_UP
-    beq @up
-    cmp #KEY_RIGHT
-    beq @up
-    bra @checkreturnkey
-@up:
-    ; up key pressed
+    sta temp
+
+    ldy #0
+@keymatch:
+    lda select_keyinput,y
+    cmp temp
+    beq @keyfound
+    cmp #0
+    beq @keyfound
+    iny
+    bra @keymatch 
+@keyfound:
+    tya
+    asl ; *2 for word index
+    tax
+    jmp (select_keyjump,x)
+    ; will never get here
+
+handle_selectup:
     lda currentlevel
     cmp no_levels
-    beq @charloop   ; maximum value reached
+    beq selectlevel_charloop   ; maximum value reached
     inc currentlevel
-    bra @mainloop
-@checkreturnkey:
-    cmp #KEY_ENTER
-    bne @checkquit
-    ; return key pressed - select this level
-    clc
-    rts
-@checkquit:
-    cmp #'q'
-    bne @charloop
-    sec ; set carry to notify caller
+    bra selectlevel
+handle_selectdown:
+    lda currentlevel
+    cmp #1
+    beq selectlevel_charloop   ; lowest value == 1
+    dec currentlevel
+    bra selectlevel
+handle_selectenter:
     rts
 
 resetvars:
@@ -1803,6 +1773,29 @@ brick:
     .byte $F7,$F7,$F7,$0,$7F,$7F,$7F,$0,$F7,$F7,$F7,$0,$7F,$7F,$7F,$0,$F7,$F7,$F7,$0,$7F,$7F,$7F,$0,$F7,$F7,$F7,$0,$7F,$7F,$7F,$0
 black:
     .byte $0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0,$0
+ingame_keyinput:
+    .byte KEY_UP,KEY_DOWN,KEY_LEFT,KEY_RIGHT,'u','U','r','R','q','Q',0
+ingame_keyjump:
+    .word handle_ingamekeyup
+    .word handle_ingamekeydown
+    .word handle_ingamekeyleft
+    .word handle_ingamekeyright
+    .word handle_ingamekeyundo
+    .word handle_ingamekeyundo
+    .word handle_ingamekeyreset
+    .word handle_ingamekeyreset
+    .word handle_ingamekeyquit
+    .word handle_ingamekeyquit
+    .word keyloop               ; the default option 
+select_keyinput:
+    .byte KEY_DOWN,KEY_LEFT,KEY_UP,KEY_RIGHT,KEY_ENTER,0
+select_keyjump:
+    .word handle_selectdown
+    .word handle_selectdown
+    .word handle_selectup
+    .word handle_selectup
+    .word handle_selectenter
+    .word selectlevel_charloop  ; the default option
 translatefrom:
     .byte '@','+','$','.','*','#',' ',0
 translateto:
