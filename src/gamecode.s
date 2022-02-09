@@ -86,7 +86,7 @@ start:
     jsr printgraphics
 
 keyloop:
-    jsr GETIN
+    jsr con_getinput
     sta temp
     ldy #0
 @keymatch:
@@ -233,7 +233,7 @@ yesnomessage:
     jsr printcenteredmesssage
     clc
 @keyloop:
-    jsr GETIN
+    jsr con_getinput
 @checkyes:
     cmp #'y'
     bne @checkno
@@ -252,19 +252,11 @@ waitforentermessage:
     jsr printcenteredmesssage
     clc
 @keyloop:
-    jsr GETIN
+    jsr con_getinput
 @checkenter:
     cmp #KEY_ENTER
     bne @checkenter
 @done:
-    rts
-
-GETIN:
-    lda $0200  ; mail flag
-    cmp #$01    ; character received?
-    bne GETIN   ; blocked wait for character
-    stz $0200  ; acknowledge receive
-    lda $0201  ; receive the character from the mailbox slot
     rts
 
 handle_undocommand:
@@ -898,7 +890,7 @@ selectlevel:
     jsr printdecimal
 
 selectlevel_charloop:
-    jsr GETIN
+    jsr con_getinput
     sta temp
 
     ldy #0
@@ -1124,7 +1116,7 @@ displaytitlescreen:
     sta strptr+1
     jsr con_print
 
-    ldx #0
+    ldx #3
     ldy #19
     jsr con_gotoxy
     lda #<help1
@@ -1668,6 +1660,14 @@ con_gotoxy:
     pla
     rts
 
+con_getinput:
+    lda $0200  ; mail flag
+    cmp #$01    ; character received?
+    bne con_getinput   ; blocked wait for character
+    stz $0200  ; acknowledge receive
+    lda $0201  ; receive the character from the mailbox slot
+    rts
+
 con_print:
     ; prints zero-terminated string pointed to by strptr in zeropage
     pha
@@ -1748,13 +1748,6 @@ con_printchar:
     plx
     pla
     rts
-
-titlescreen:
-.incbin "tiles/titlescreen.bin"
-messagescreen:
-.incbin "tiles/messagescreen.bin"
-completescreen:
-.incbin "tiles/complete.bin"
 
 ; tile data
 ; each tile consists of 16x16, 4x8x8 laid out sequentially
