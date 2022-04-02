@@ -60,7 +60,7 @@ undocounter:    .byte 0
 ; ZP_PTR_1 - temporary pointer
 ; ZP_PTR_2 - temporary pointer
 ; ZP_PTR_3 - position of player
-ZP_PTR_FIELD = $28
+ZP_PTR_FIELD = $2A
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
 
@@ -71,6 +71,8 @@ start:
 
     jsr loadtiles       ; load tiles from normal memory to VRAM
     jsr layerconfig     ; configure layer 0/1 on screen
+
+    jsr cls
 
     jsr resetvars
     jsr cleartiles
@@ -215,14 +217,14 @@ asknewlevel:
 
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$10
+    lda #$11
     sta VERA_HIGH
 
     lda #<done0
     sta ZP_PTR_1
     lda #>done0
     sta ZP_PTR_1+1
-    lda #37
+    lda #213 ; line 37
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -232,7 +234,7 @@ asknewlevel:
     sta ZP_PTR_1
     lda #>done1
     sta ZP_PTR_1+1
-    lda #41
+    lda #217     ; line 41
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -242,7 +244,7 @@ asknewlevel:
     sta ZP_PTR_1
     lda #>done2
     sta ZP_PTR_1+1
-    lda #45
+    lda #221     ; line 45
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -875,7 +877,6 @@ printdecimal:
     tya
     cmp #$30 ; is it a '0' petscii?
     beq @tens
-;    jsr CHROUT ; print Y
     sta VERA_DATA0
     lda temp
     sta VERA_DATA0
@@ -883,13 +884,11 @@ printdecimal:
     pla
     cmp #$30 ; is it a '0' petscii?
     beq @ones
-;    jsr CHROUT ; print X
     sta VERA_DATA0
     lda temp
     sta VERA_DATA0
 @ones:
     pla
-;    jsr CHROUT ; print A
     sta VERA_DATA0
     lda temp
     sta VERA_DATA0
@@ -907,13 +906,13 @@ selectlevel:
     ; text prep to VERA
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$10
+    lda #$11
     sta VERA_HIGH
     lda #<selectmessage
     sta ZP_PTR_1
     lda #>selectmessage
     sta ZP_PTR_1+1
-    lda #45
+    lda #221     ; line 45
     sta VERA_MID
     lda #10*2
     sta VERA_LOW
@@ -1001,13 +1000,13 @@ clearselect:
     ; clear out select text first
     stz VERA_CTRL
     ldx #$9
-    lda #$10
+    lda #$11
     sta VERA_HIGH
     lda #<clear
     sta ZP_PTR_1
     lda #>clear
     sta ZP_PTR_1+1
-    lda #45
+    lda #221     ;line 45
     sta VERA_MID
     lda #10*2
     sta VERA_LOW
@@ -1300,9 +1299,9 @@ displaymessagescreen:
     sta ZP_PTR_1
     stz VERA_CTRL
     ;lda #%00100000
-    lda #$10
+    lda #$11
     sta VERA_HIGH
-    lda #28
+    lda #204    ; was 28
     sta VERA_MID
     lda #28*2
     sta VERA_LOW
@@ -1376,14 +1375,14 @@ displaytitlescreen:
 
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$10
+    lda #$11
     sta VERA_HIGH
 
     lda #<help0
     sta ZP_PTR_1
     lda #>help0
     sta ZP_PTR_1+1
-    lda #23
+    lda #199     ; line 23
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1393,7 +1392,7 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help1
     sta ZP_PTR_1+1
-    lda #30
+    lda #206     ; line 30
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1403,7 +1402,7 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help2
     sta ZP_PTR_1+1
-    lda #32
+    lda #208     ; line 32
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1413,7 +1412,7 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help3
     sta ZP_PTR_1+1
-    lda #33
+    lda #209     ; line 33
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1423,7 +1422,7 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help4
     sta ZP_PTR_1+1
-    lda #34
+    lda #210     ; line 34
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1433,7 +1432,7 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help5
     sta ZP_PTR_1+1
-    lda #35
+    lda #211     ; line 35
     sta VERA_MID
     lda #50*2
     sta VERA_LOW

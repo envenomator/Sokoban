@@ -63,10 +63,10 @@ r15L					= r15
 r15H					= r15+1
 
 ; Zero-Page userspace
-ZP_PTR_1          = $00	; first four pointers for temporary use only
-ZP_PTR_2          = $22
-ZP_PTR_3          = $24
-ZP_PTR_4          = $26
+ZP_PTR_1          = $22	; first four pointers for temporary use only
+ZP_PTR_2          = $24
+ZP_PTR_3          = $26
+ZP_PTR_4          = $28
 
 ; I/O Registers
 VERA_addr_low     = $9F20
@@ -206,7 +206,7 @@ BASIC_INIT        := $C003
 
 
 ; VRAM Addresses
-VRAM_petscii   = $0F800
+VRAM_petscii   = $0F000
 VRAM_psg       = $1F9C0
 VRAM_palette   = $1FA00
 VRAM_sprattr   = $1FC00
