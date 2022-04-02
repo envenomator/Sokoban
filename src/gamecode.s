@@ -1781,13 +1781,14 @@ ingame_keyjump:
     .word handle_ingamekeyquit
     .word keyloop               ; the default option 
 select_keyinput:
-    .byte KEY_DOWN,KEY_LEFT,KEY_UP,KEY_RIGHT,KEY_ENTER,0
+    .byte KEY_DOWN,KEY_LEFT,KEY_UP,KEY_RIGHT,KEY_ENTER,'q',0
 select_keyjump:
     .word handle_selectdown
     .word handle_selectdown
     .word handle_selectup
     .word handle_selectup
     .word handle_selectenter
+    .word exit
     .word selectlevel_charloop  ; the default option
 translatefrom:
     .byte '@','+','$','.','*','#',' ',0
