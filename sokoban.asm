@@ -63,8 +63,24 @@ undocounter:    .byte 0
 ZP_PTR_FIELD = $2A
 temp = $30  ; used for temp 8/16 bit storage $30/$31
 ZP_PTR_UNDO = $32 ; used to point to the 'undo stack'
+vera_textbase = $34;  RAM base for VERA text mode
+vera_highbit  = $36;  RAM base bit 16
 
 start:
+    ; First read VERA screen RAM in text mode
+    lda $9F35;
+    and #%01111111      ; clear out high bit, which is address bit 16
+    asl                 ; shift result one bit up
+    sta vera_textbase   ; store as the offset. r38 = 0, r39 = B0
+                        ; add this offset to vertical line offset in code
+    lda $9F35
+    bmi @highbit        ; high bit set
+    stz vera_highbit
+    bra @veraoffsetdone
+@highbit:
+    lda #1              ; high bit set
+    sta vera_highbit
+@veraoffsetdone:
     ; force uppercase
     lda #UPPERCASE
     jsr CHROUT
@@ -78,6 +94,7 @@ start:
     jsr cleartiles
 
     jsr displaytitlescreen
+
     jsr selectlevel
     bcc @continue
     jsr resetlayerconfig
@@ -217,14 +234,18 @@ asknewlevel:
 
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$11
+    lda #$10
+    clc
+    adc vera_highbit
     sta VERA_HIGH
 
     lda #<done0
     sta ZP_PTR_1
     lda #>done0
     sta ZP_PTR_1+1
-    lda #213 ; line 37
+    lda #37 ; line 37
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -234,7 +255,9 @@ asknewlevel:
     sta ZP_PTR_1
     lda #>done1
     sta ZP_PTR_1+1
-    lda #217     ; line 41
+    lda #41     ; line 41
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -244,7 +267,9 @@ asknewlevel:
     sta ZP_PTR_1
     lda #>done2
     sta ZP_PTR_1+1
-    lda #221     ; line 45
+    lda #45     ; line 45
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #38*2
     sta VERA_LOW
@@ -906,13 +931,17 @@ selectlevel:
     ; text prep to VERA
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$11
+    lda #$10
+    clc
+    adc vera_highbit
     sta VERA_HIGH
     lda #<selectmessage
     sta ZP_PTR_1
     lda #>selectmessage
     sta ZP_PTR_1+1
-    lda #221     ; line 45
+    lda #45     ; line 45
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #10*2
     sta VERA_LOW
@@ -1000,13 +1029,17 @@ clearselect:
     ; clear out select text first
     stz VERA_CTRL
     ldx #$9
-    lda #$11
+    lda #$10
+    clc
+    adc vera_highbit
     sta VERA_HIGH
     lda #<clear
     sta ZP_PTR_1
     lda #>clear
     sta ZP_PTR_1+1
-    lda #221     ;line 45
+    lda #45     ;line 45
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #10*2
     sta VERA_LOW
@@ -1299,9 +1332,13 @@ displaymessagescreen:
     sta ZP_PTR_1
     stz VERA_CTRL
     ;lda #%00100000
-    lda #$11
+    lda #$10
+    clc
+    adc vera_highbit
     sta VERA_HIGH
-    lda #204    ; was 28
+    lda #28    ; was 28
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #28*2
     sta VERA_LOW
@@ -1312,6 +1349,7 @@ displaymessagescreen:
 printverastring:
     ; ZP_PTR_1 is pointing to the string
     ; x contains color of the text
+    clc
     ldy #0
 @loop:
     lda (ZP_PTR_1),y
@@ -1375,24 +1413,29 @@ displaytitlescreen:
 
     stz VERA_CTRL
     ldx #$9 ; color brown
-    lda #$11
+    lda #$10
+    clc
+    adc vera_highbit
     sta VERA_HIGH
 
     lda #<help0
     sta ZP_PTR_1
     lda #>help0
     sta ZP_PTR_1+1
-    lda #199     ; line 23
+    lda #23     ; line 23
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
     jsr printverastring
-
     lda #<help1
     sta ZP_PTR_1
     lda #>help1
     sta ZP_PTR_1+1
-    lda #206     ; line 30
+    lda #30     ; line 30
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1402,7 +1445,9 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help2
     sta ZP_PTR_1+1
-    lda #208     ; line 32
+    lda #32     ; line 32
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1412,7 +1457,9 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help3
     sta ZP_PTR_1+1
-    lda #209     ; line 33
+    lda #33     ; line 33
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1422,7 +1469,9 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help4
     sta ZP_PTR_1+1
-    lda #210     ; line 34
+    lda #34     ; line 34
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
@@ -1432,7 +1481,9 @@ displaytitlescreen:
     sta ZP_PTR_1
     lda #>help5
     sta ZP_PTR_1+1
-    lda #211     ; line 35
+    lda #35     ; line 35
+    clc
+    adc vera_textbase
     sta VERA_MID
     lda #50*2
     sta VERA_LOW
